@@ -19,6 +19,7 @@ export default function MainLayout() {
         <Route path="/about" element={<About />} />
         <Route path="/events" element={<Events />} />
         <Route path="/events/:id" element={<EventDetails />} />
+        
       </Routes>
       <Footer />
     </div>
