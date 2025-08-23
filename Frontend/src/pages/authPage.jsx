@@ -1,8 +1,355 @@
 import { useState } from "react";
-import SignInForm from "../components/signInForm";
-import SignUpForm from "../components/signUpForm";
 
-export default function AuthPage() {
+// Mock components for demonstration
+const SignInForm = () => {
+  return (
+    <div className="w-full max-w-md space-y-6 text-center bg-white/80 backdrop-blur-lg rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/60">
+      <div className="text-center">
+        <h2 className="text-3xl font-light tracking-wide text-gray-800 mb-2">
+          Welcome back
+        </h2>
+        <p className="text-gray-500 text-sm">Sign in to your account</p>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <input
+            type="email"
+            placeholder="Email address"
+            className="w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-0 transition-all duration-300 placeholder-gray-400 text-gray-700"
+          />
+        </div>
+        <div>
+          <input
+            type="password"
+            placeholder="Password"
+            className="w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-0 transition-all duration-300 placeholder-gray-400 text-gray-700"
+          />
+        </div>
+        <button
+          type="submit"
+          className="cursor-pointer w-fit px-8 py-3 rounded-full bg-gradient-to-r from-purple-500 to-purple-400 text-white font-medium tracking-wide hover:shadow-lg hover:shadow-purple-400/25 transform hover:scale-105 transition-all duration-300"
+          onClick={() => console.log("Navigate to home")}
+        >
+          Sign In
+        </button>
+      </div>
+
+      <div className="text-center">
+        <a
+          href="#"
+          className="text-sm text-purple-600 hover:text-purple-500 transition-colors"
+        >
+          Forgot your password?
+        </a>
+      </div>
+    </div>
+  );
+};
+
+const SignUpForm = () => {
+  const [selectedRole, setSelectedRole] = useState("Student");
+  const [verificationMethod, setVerificationMethod] = useState("email");
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+  });
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState("");
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = "Full name is required";
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Name must be at least 2 characters";
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim()) {
+      newErrors.email = "Email address is required";
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+
+    // Phone validation
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Phone number is required";
+    } else if (!phoneRegex.test(formData.phone.replace(/\s/g, ""))) {
+      newErrors.phone = "Please enter a valid phone number";
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+    } else if (formData.password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      newErrors.password =
+        "Password must contain uppercase, lowercase, and number";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+    setSubmitMessage("");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsLoading(true);
+    setSubmitMessage("");
+
+    try {
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        password: formData.password,
+        verificationMethod: verificationMethod,
+        role: selectedRole,
+      };
+
+      const response = await fetch("http://localhost:7000/api/user/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSubmitMessage(
+          "Account created successfully! Please check your " +
+            verificationMethod +
+            " for verification."
+        );
+        // Reset form
+        setFormData({ name: "", email: "", phone: "", password: "" });
+        setSelectedRole("student");
+        setVerificationMethod("email");
+      } else {
+        setSubmitMessage(
+          data.message || "Registration failed. Please try again."
+        );
+      }
+    } catch (error) {
+      setSubmitMessage(
+        "Network error. Please check your connection and try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-md space-y-6 bg-white/80 backdrop-blur-lg rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/60">
+      <div className="text-center">
+        <h2 className="text-3xl font-light tracking-wide text-gray-800 mb-2">
+          Create account
+        </h2>
+        <p className="text-gray-500 text-sm">Join us today</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="text-center space-y-4">
+        <div>
+          <input
+            type="text"
+            name="name"
+            placeholder="Full name"
+            value={formData.name}
+            onChange={handleInputChange}
+            className={`w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border transition-all duration-300 placeholder-gray-400 text-gray-700 focus:outline-none focus:ring-0 ${
+              errors.name
+                ? "border-red-400 focus:border-red-400"
+                : "border-gray-200 focus:border-purple-400"
+            }`}
+          />
+          {errors.name && (
+            <p className="text-red-500 text-xs mt-1 text-left">{errors.name}</p>
+          )}
+        </div>
+        <div>
+          <input
+            type="email"
+            name="email"
+            placeholder="Email address"
+            value={formData.email}
+            onChange={handleInputChange}
+            className={`w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border transition-all duration-300 placeholder-gray-400 text-gray-700 focus:outline-none focus:ring-0 ${
+              errors.email
+                ? "border-red-400 focus:border-red-400"
+                : "border-gray-200 focus:border-purple-400"
+            }`}
+          />
+          {errors.email && (
+            <p className="text-red-500 text-xs mt-1 text-left">
+              {errors.email}
+            </p>
+          )}
+        </div>
+        <div>
+          <input
+            type="tel"
+            name="phone"
+            placeholder="Phone number"
+            value={formData.phone}
+            onChange={handleInputChange}
+            className={`w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border transition-all duration-300 placeholder-gray-400 text-gray-700 focus:outline-none focus:ring-0 ${
+              errors.phone
+                ? "border-red-400 focus:border-red-400"
+                : "border-gray-200 focus:border-purple-400"
+            }`}
+          />
+          {errors.phone && (
+            <p className="text-red-500 text-xs mt-1 text-left">
+              {errors.phone}
+            </p>
+          )}
+        </div>
+        <div>
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={formData.password}
+            onChange={handleInputChange}
+            className={`w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border transition-all duration-300 placeholder-gray-400 text-gray-700 focus:outline-none focus:ring-0 ${
+              errors.password
+                ? "border-red-400 focus:border-red-400"
+                : "border-gray-200 focus:border-purple-400"
+            }`}
+          />
+          {errors.password && (
+            <p className="text-red-500 text-xs mt-1 text-left">
+              {errors.password}
+            </p>
+          )}
+        </div>
+
+        {/* Verification Method Selection */}
+        <div className="w-full">
+          <p className="text-sm text-gray-600 mb-3 text-left">
+            Verification method
+          </p>
+          <div className="flex space-x-3">
+            {["email", "phone"].map((method) => (
+              <label
+                key={method}
+                className={`flex-1 relative cursor-pointer rounded-xl px-4 py-3 transition-all duration-300 ${
+                  verificationMethod === method
+                    ? "bg-gradient-to-r from-purple-500 to-purple-400 text-white shadow-lg shadow-purple-400/25"
+                    : "bg-white/60 backdrop-blur-sm border border-gray-200 text-gray-700 hover:border-purple-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="verificationMethod"
+                  value={method}
+                  checked={verificationMethod === method}
+                  onChange={(e) => setVerificationMethod(e.target.value)}
+                  className="absolute opacity-0 pointer-events-none"
+                />
+                <div className="flex items-center justify-center">
+                  <span className="text-sm font-medium capitalize tracking-wide">
+                    {method}
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Role Selection */}
+        <div className="w-full">
+          <p className="text-sm text-gray-600 mb-3 text-left">
+            Select your role
+          </p>
+          <div className="flex space-x-3">
+            {["Student", "Admin"].map((role) => (
+              <label
+                key={role}
+                className={`flex-1 relative cursor-pointer rounded-xl px-4 py-3 transition-all duration-300 ${
+                  selectedRole === role
+                    ? "bg-gradient-to-r from-purple-500 to-purple-400 text-white shadow-lg shadow-purple-400/25"
+                    : "bg-white/60 backdrop-blur-sm border border-gray-200 text-gray-700 hover:border-purple-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  value={role}
+                  checked={selectedRole === role}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="absolute opacity-0 pointer-events-none"
+                />
+                <div className="flex items-center justify-center">
+                  <span className="text-sm font-medium capitalize tracking-wide">
+                    {role}
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className={`cursor-pointer w-full py-3 px-6 rounded-full font-medium tracking-wide transition-all duration-300 ${
+            isLoading
+              ? "bg-gray-400 text-white cursor-not-allowed"
+              : "bg-gradient-to-r from-purple-500 to-purple-400 text-white hover:shadow-lg hover:shadow-purple-400/25 transform hover:scale-105"
+          }`}
+        >
+          {isLoading ? "Creating Account..." : "Create Account"}
+        </button>
+
+        {submitMessage && (
+          <div
+            className={`mt-4 p-3 rounded-xl text-sm ${
+              submitMessage.includes("successfully")
+                ? "bg-green-100 text-green-700 border border-green-200"
+                : "bg-red-100 text-red-700 border border-red-200"
+            }`}
+          >
+            {submitMessage}
+          </div>
+        )}
+      </form>
+
+      <div className="text-center">
+        <p className="text-xs text-gray-500">
+          By signing up, you agree to our Terms of Service and Privacy Policy
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const AuthPage = () => {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
 
   const toggleSignUpMode = () => {
@@ -10,142 +357,211 @@ export default function AuthPage() {
   };
 
   return (
-    <div
-      className={`text-white relative w-full bg-white min-h-[100vh] lg:min-h-screen overflow-hidden
-           before:content-[''] before:absolute before:w-[1500px] before:h-[1500px] lg:before:h-[2000px] 
-           lg:before:w-[2000px] lg:before:top-[-10%]  before:top-[initial] lg:before:right-[48%] 
-           before:right-[initial]  max-lg:before:left-[30%] max-sm:bottom-[72%]   max-md:before:left-1/2 
-            max-lg:before:bottom-[75%]  before:z-[6] before:rounded-[50%]    max-md:p-6     
-            lg:before:-translate-y-1/2  max-lg:before:-translate-x-1/2  before:bg-backgroundColor 
-            before:transition-all before:duration-[2s] lg:before:duration-[1.8s]  ${
+    <div className="relative w-full min-h-screen overflow-hidden bg-gradient-to-br from-purple-50 via-white to-purple-100">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute top-20 left-20 w-32 h-32 bg-purple-300 rounded-full blur-3xl animate-pulse"></div>
+        <div
+          className="absolute bottom-20 right-20 w-48 h-48 bg-purple-200 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "1s" }}
+        ></div>
+        <div
+          className="absolute top-1/2 left-1/3 w-24 h-24 bg-purple-400 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "0.5s" }}
+        ></div>
+      </div>
+
+      {/* Sliding background panel */}
+      <div
+        className="absolute bg-gradient-to-br from-purple-600 via-purple-500 to-purple-400 rounded-full z-10 transition-all ease-in-out"
+        style={{
+          width: window.innerWidth > 1024 ? "2000px" : "1500px",
+          height: window.innerWidth > 1024 ? "2000px" : "1500px",
+          top: window.innerWidth > 1024 ? "-10%" : "initial",
+          bottom: window.innerWidth > 1024 ? "initial" : "75%",
+          right: window.innerWidth > 1024 ? "50%" : "initial",
+          left: window.innerWidth > 1024 ? "initial" : "30%",
+          transform: `
+            ${
+              window.innerWidth > 1024 ? "translateY(-50%)" : "translateX(-50%)"
+            } 
+            ${
               isSignUpMode
-                ? `lg:before:translate-x-full before:-translate-x-1/2 
-          before:translate-y-full lg:before:right-[52%] before:right-[initial]  sm:max-lg:before:bottom-[22%]
-           max-sm:before:bottom-[20%]  max-md:before:left-1/2`
+                ? window.innerWidth > 1024
+                  ? "translateX(100%)"
+                  : "translateY(100%)"
                 : ""
-            }`}
-    >
+            }
+          `,
+          transitionDuration: "1.8s",
+        }}
+      />
+
+      {/* Forms Container */}
       <div className="absolute w-full h-full top-0 left-0">
         <div
-          className={` absolute top-[95%] lg:top-1/2 left-1/2 grid grid-cols-1 z-[5] -translate-x-1/2 
-             -translate-y-full lg:-translate-y-1/2 lg:w-1/2 w-full  transition-[1s]  duration-[0.8s] 
-             lg:duration-[0.7s] ease-[ease-in-out] "  ${
-               isSignUpMode
-                 ? "lg:left-1/4   max-lg:top-[-10%]   max-lg:-translate-x-2/4   max-lg:translate-y-0"
-                 : "lg:left-3/4 "
-             } `}
+          className="absolute z-20 grid grid-cols-1 w-full transition-all ease-in-out"
+          style={{
+            top: window.innerWidth > 1024 ? "50%" : "95%",
+            left: isSignUpMode
+              ? window.innerWidth > 1024
+                ? "25%"
+                : "50%"
+              : window.innerWidth > 1024
+              ? "75%"
+              : "50%",
+            width: window.innerWidth > 1024 ? "50%" : "100%",
+            transform: `
+              translateX(-50%) 
+              ${
+                window.innerWidth > 1024
+                  ? "translateY(-50%)"
+                  : isSignUpMode
+                  ? "translateY(0%)"
+                  : "translateY(-100%)"
+              }
+            `,
+            transitionDuration: "0.7s",
+          }}
         >
+          {/* Sign In Form */}
           <div
-            className={` flex items-center justify-center flex-col   transition-all duration-[0.2s] delay-[0.7s] 
-              overflow-hidden col-start-1 col-end-2 row-start-1 row-end-2 px-20 max-lg:mt-60  z-20 max-md:px-6 
-              max-md:py-0 ${isSignUpMode ? " opacity-0 z-10 " : " "}`}
+            className={`py-6 flex items-center justify-center flex-col px-6 lg:px-20 transition-all overflow-hidden col-start-1 col-end-2 row-start-1 row-end-2 max-lg:mt-60 ${
+              isSignUpMode ? "opacity-0 z-10" : "opacity-100 z-20"
+            }`}
+            style={{
+              transitionDuration: "0.2s",
+              transitionDelay: "0.7s",
+            }}
           >
             <SignInForm />
           </div>
 
+          {/* Sign Up Form */}
           <div
-            className={`flex items-center justify-center flex-col px-20 transition-all  ease-in-out duration-[0.2s]
-               delay-[0.7s] overflow-hidden col-start-1 col-end-2 row-start-1 row-end-2 py-0 z-10 max-md:px-6 
-               max-md:py-0 opacity-0 ${
-                 isSignUpMode ? "opacity-100 z-20 " : "  "
-               }`}
+            className={`py-6 flex items-center justify-center flex-col px-6 lg:px-20 transition-all overflow-hidden col-start-1 col-end-2 row-start-1 row-end-2 ${
+              isSignUpMode ? "opacity-100 z-20" : "opacity-0 z-10"
+            }`}
+            style={{
+              transitionDuration: "0.2s",
+              transitionDelay: "0.7s",
+            }}
           >
             <SignUpForm />
           </div>
         </div>
       </div>
 
-      <div
-        className="absolute h-full w-full top-0 left-0 grid grid-cols-1   max-lg:grid-rows-[1fr_2fr_1fr]  
-      lg:grid-cols-2"
-      >
+      {/* Side Panels */}
+      <div className="absolute h-full w-full top-0 left-0 grid grid-cols-1 max-lg:grid-rows-3 lg:grid-cols-2">
+        {/* Left Panel - Sign Up Promotion */}
         <div
-          className={`flex flex-row justify-around lg:flex-col items-center  max-lg:col-start-1 max-lg:col-end-2  
-            max-lg:px-[8%]   max-lg:py-10 lg:items-end  text-center z-[6]   max-lg:row-start-1 max-lg:row-end-2    
-             pl-[12%] pr-[17%] pt-12 pb-8 ${
-               isSignUpMode ? "pointer-events-none" : " pointer-events-auto"
-             }`}
+          className={`flex flex-col justify-center items-center lg:items-start space-y-8 max-lg:col-start-1 max-lg:col-end-2 max-lg:row-start-1 max-lg:row-end-2 max-lg:px-8 max-lg:py-10 lg:pl-12 lg:pr-16 lg:pt-12 lg:pb-8 text-center lg:text-left z-30 ${
+            isSignUpMode ? "pointer-events-none" : "pointer-events-auto"
+          }`}
         >
           <div
-            className={`text-white transition-transform duration-[0.9s]  lg:duration-[1.1s] ease-[ease-in-out] 
-               delay-[0.8s] lg:delay-[0.4s]   max-lg:pr-[15%]  max-md:px-4  max-md:py-2 ${
-                 isSignUpMode
-                   ? "lg:translate-x-[-800px]   max-lg:translate-y-[-300px]"
-                   : ""
-               }`}
+            className={`flex flex-col items-center lg:items-start space-y-6 text-white transition-transform ease-in-out max-lg:pr-8 max-md:px-4 max-md:py-2 ${
+              isSignUpMode
+                ? "lg:translate-x-[-800px] max-lg:translate-y-[-300px]"
+                : ""
+            }`}
+            style={{
+              transitionDuration: "1.1s",
+              transitionDelay: "0.4s",
+            }}
           >
-            <h3 className="font-semibold leading-none text-[1.2rem] lg:text-[1.5rem] ">
-              New here ?
-            </h3>
-            <p className="text-[0.7rem] lg:text-[0.95rem] px-0 py-2 lg:py-[0.7rem]">
-              Sign up and discover our platform
-            </p>
+            <div className="space-y-4">
+              <h3 className="font-light text-3xl lg:text-4xl tracking-wide">
+                New here?
+              </h3>
+              <p className="text-sm lg:text-base max-w-sm leading-relaxed text-white/90">
+                Join our community and discover amazing events tailored just for
+                you.
+              </p>
+            </div>
+
             <button
-              className="bg-transparent w-[110px] h-[35px] text-[0.7rem] lg:w-[130px] lg:h-[41px] 
-              lg:text-[0.8rem]  font-semibold   border-2 border-white rounded-full transition-colors duration-300 
-              hover:bg-white hover:text-gray-500 cursor-pointer"
-              id="sign-up-btn"
+              className="px-8 py-3 rounded-full text-white bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white hover:text-purple-600 transform hover:scale-105 transition-all duration-300 font-medium tracking-wide"
               onClick={toggleSignUpMode}
             >
-              Sign up
+              Create Account
             </button>
           </div>
 
-          <img
-            src="/signin.svg"
-            className={`  max-md:hidden max-lg:translate-y-[-40px] w-[200px] lg:w-full transition-transform 
-              duration-[0.9s] lg:duration-[1.1s] ease-[ease-in-out] delay-[0.6s] lg:delay-[0.4s] ${
-                isSignUpMode
-                  ? "lg:translate-x-[-800px]   max-lg:translate-y-[-300px]"
-                  : ""
-              }`}
-            alt="login"
-          />
+          {/* Decorative Icon */}
+          <div
+            className={`hidden md:block w-48 lg:w-80 max-w-xs transition-transform ease-in-out ${
+              isSignUpMode
+                ? "lg:translate-x-[-800px] max-lg:translate-y-[-300px]"
+                : ""
+            }`}
+            style={{
+              transitionDuration: "1.1s",
+              transitionDelay: "0.4s",
+            }}
+          >
+            <div className="w-full h-48 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center border border-white/20">
+              <div className="text-6xl">👋</div>
+            </div>
+          </div>
         </div>
+
+        {/* Right Panel - Sign In Promotion */}
         <div
-          className={`flex flex-row   max-lg:row-start-3 max-lg:row-end-4 lg:flex-col items-center lg:items-end 
-            justify-around text-center z-[6]   max-lg:col-start-1 max-lg:col-end-2  max-lg:px-[8%]   max-lg:py-10 
-             pl-[17%] pr-[12%] pt-12 pb-8 ${
-               isSignUpMode ? " pointer-events-auto" : "pointer-events-none"
-             }`}
+          className={`flex flex-col justify-center items-center lg:items-end space-y-8 max-lg:row-start-3 max-lg:row-end-4 max-lg:col-start-1 max-lg:col-end-2 max-lg:px-8 max-lg:py-10 lg:pl-16 lg:pr-12 lg:pt-12 lg:pb-8 text-center lg:text-right z-30 ${
+            isSignUpMode ? "pointer-events-auto" : "pointer-events-none"
+          }`}
         >
           <div
-            className={`text-white transition-transform duration-[0.9s] lg:duration-[1.1s] ease-in-out delay-[0.8s]
-               lg:delay-[0.4s]   max-lg:pr-[15%] max-md:px-4  max-md:py-2 ${
-                 isSignUpMode
-                   ? ""
-                   : "lg:translate-x-[800px]   max-lg:translate-y-[300px]"
-               }`}
+            className={`flex flex-col items-center lg:items-end space-y-6 text-white transition-transform ease-in-out max-lg:pr-8 max-md:px-4 max-md:py-2 ${
+              isSignUpMode
+                ? ""
+                : "lg:translate-x-[800px] max-lg:translate-y-[300px]"
+            }`}
+            style={{
+              transitionDuration: "1.1s",
+              transitionDelay: "0.4s",
+            }}
           >
-            <h3 className="font-semibold leading-none text-[1.2rem] lg:text-[1.5rem] ">
-              One of us ?
-            </h3>
-            <p className=" py-2 text-[0.7rem] lg:text-[0.95rem] px-0  lg:py-[0.7rem]">
-              Sign in to your account to have hastle free experience
-            </p>
+            <div className="space-y-4">
+              <h3 className="font-light text-3xl lg:text-4xl tracking-wide">
+                Welcome back
+              </h3>
+              <p className="text-sm lg:text-base max-w-sm leading-relaxed text-white/90">
+                Sign in to continue your journey and explore personalized
+                events.
+              </p>
+            </div>
+
             <button
-              className="bg-transparent w-[110px] h-[35px]  text-[0.7rem] lg:w-[130px] 
-              lg:h-[41px] lg:text-[0.8rem]  font-semibold   border-2 border-white rounded-full 
-              transition-colors duration-300 hover:bg-white hover:text-gray-500 cursor-pointer"
-              id="sign-in-btn"
+              className="px-8 py-3 rounded-full text-white bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white hover:text-purple-600 transform hover:scale-105 transition-all duration-300 font-medium tracking-wide"
               onClick={toggleSignUpMode}
             >
-              Sign in
+              Sign In
             </button>
           </div>
 
-          <img
-            src="signup.svg"
-            className={`  max-md:hidden w-[200px] lg:w-full transition-transform duration-[0.9s] 
-              lg:duration-[1.1s] ease-[ease-in-out] delay-[0.6s] lg:delay-[0.4s] ${
-                isSignUpMode
-                  ? ""
-                  : "lg:translate-x-[800px]  max-lg:translate-y-[300px]"
-              }`}
-            alt="register"
-          />
+          {/* Decorative Icon */}
+          <div
+            className={`hidden md:block w-48 lg:w-80 max-w-xs transition-transform ease-in-out ${
+              isSignUpMode
+                ? ""
+                : "lg:translate-x-[800px] max-lg:translate-y-[300px]"
+            }`}
+            style={{
+              transitionDuration: "1.1s",
+              transitionDelay: "0.4s",
+            }}
+          >
+            <div className="w-full h-48 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center border border-white/20">
+              <div className="text-6xl">🎉</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default AuthPage;
