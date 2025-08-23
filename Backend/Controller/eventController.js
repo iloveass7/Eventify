@@ -306,3 +306,17 @@ export const generateCertificate = catchAsyncError(async (req, res, next) => {
 
   doc.end();
 });
+
+export const getPastEvents = catchAsyncError(async (req, res, next) => {
+  const now = new Date();
+
+  const pastEvents = await Event.find({ time: { $lt: now } }).sort({
+    time: -1,
+  });
+
+  res.status(200).json({
+    success: true,
+    count: pastEvents.length,
+    events: pastEvents,
+  });
+});
