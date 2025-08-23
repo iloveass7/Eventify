@@ -11,7 +11,6 @@ import {
   updateProfilePicture,
 } from "../Controller/userController.js";
 import { isAuthenticated } from "../Middleware/auth.js";
-import upload from "../Middleware/multer.js";
 
 const router = express.Router();
 
