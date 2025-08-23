@@ -355,3 +355,13 @@ export const updateProfilePicture = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Image upload failed.", 500));
   }
 });
+
+export const getAllUsers = catchAsyncError(async (req, res, next) => {
+  const users = await User.find();
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    users,
+  });
+});
