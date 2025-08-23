@@ -7,6 +7,8 @@ import {
   getUser,
   forgotPassword,
   resetPassword,
+  editUser,
+  updateProfilePicture,
 } from "../Controller/userController.js";
 import { isAuthenticated } from "../Middleware/auth.js";
 
@@ -19,5 +21,9 @@ router.route("/logout").get(isAuthenticated, logout);
 router.route("/password/forgot").post(forgotPassword);
 router.route("/password/reset/:token").put(resetPassword);
 router.route("/me").get(isAuthenticated, getUser);
+router.route("/me/update").put(isAuthenticated, editUser);
+router
+  .route("/me/update/picture")
+  .put(isAuthenticated, upload.single("profileImage"), updateProfilePicture);
 
 export default router;

@@ -5,86 +5,53 @@ import { sendEmail } from "../Utils/sendEmail.js";
 import twilio from "twilio";
 import { sendToken } from "../Utils/sendToken.js";
 import crypto from "crypto";
+import { uploadToCloudinary } from "../Utils/cloudinary.js";
 
 const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
 export const register = catchAsyncError(async (req, res, next) => {
-  try {
-    const { name, email, phone, password, verificationMethod } = req.body;
-    if (
-      !name ||
-      !email ||
-      !phone ||
-      !password ||
-      !verificationMethod ||
-      !role
-    ) {
-      return next(new ErrorHandler("All fields are required.", 400));
-    }
-    function validatePhoneNumber(phone) {
-      const phoneRegex = /^\+880\d{9}$/;
-      return phoneRegex.test(phone);
-    }
+  const { name, email, phone, password, verificationMethod, role } = req.body;
 
-    if (!validatePhoneNumber(phone)) {
-      return next(new ErrorHandler("Invalid phone number.", 400));
-    }
-
-    const existingUser = await User.findOne({
-      $or: [
-        {
-          email,
-          accountVerified: true,
-        },
-        {
-          phone,
-          accountVerified: true,
-        },
-      ],
-    });
-
-    if (existingUser) {
-      return next(new ErrorHandler("Phone or Email is already used.", 400));
-    }
-
-    const registerationAttemptsByUser = await User.find({
-      $or: [
-        { phone, accountVerified: false },
-        { email, accountVerified: false },
-      ],
-    });
-
-    if (registerationAttemptsByUser.length > 3) {
-      return next(
-        new ErrorHandler(
-          "You have exceeded the maximum number of attempts (3). Please try again after an hour.",
-          400
-        )
-      );
-    }
-
-    const userData = {
-      name,
-      email,
-      phone,
-      password,
-      role,
-    };
-
-    const user = await User.create(userData);
-    const verificationCode = await user.generateVerificationCode();
-    await user.save();
-    sendVerificationCode(
-      verificationMethod,
-      verificationCode,
-      name,
-      email,
-      phone,
-      res
-    );
-  } catch (error) {
-    next(error);
+  if (!name || !email || !phone || !password || !verificationMethod || !role) {
+    return next(new ErrorHandler("All fields are required.", 400));
   }
+
+  function validatePhoneNumber(phone) {
+    const phoneRegex = /^\+8801\d{9}$/;
+    return phoneRegex.test(phone);
+  }
+
+  if (!validatePhoneNumber(phone)) {
+    return next(new ErrorHandler("Invalid phone number.", 400));
+  }
+
+  const existingUser = await User.findOne({
+    $or: [
+      { email, accountVerified: true },
+      { phone, accountVerified: true },
+    ],
+  });
+
+  if (existingUser) {
+    return next(new ErrorHandler("Phone or Email is already used.", 400));
+  }
+
+  const userData = { name, email, phone, password, role };
+
+  const user = new User(userData);
+
+  const verificationCode = user.generateVerificationCode();
+
+  await user.save();
+
+  await sendVerificationCode(
+    verificationMethod,
+    verificationCode,
+    name,
+    email,
+    phone,
+    res
+  );
 });
 
 async function sendVerificationCode(
@@ -157,7 +124,7 @@ export const verifyOTP = catchAsyncError(async (req, res, next) => {
   const { email, otp, phone } = req.body;
 
   function validatePhoneNumber(phone) {
-    const phoneRegex = /^\+880\d{9}$/;
+    const phoneRegex = /^\+8801\d{9}$/;
     return phoneRegex.test(phone);
   }
 
@@ -332,4 +299,59 @@ export const resetPassword = catchAsyncError(async (req, res, next) => {
   await user.save();
 
   sendToken(user, 200, "Reset Password Successfully.", res);
+});
+
+export const editUser = catchAsyncError(async (req, res, next) => {
+  const { name, phone, universityId, password } = req.body;
+
+  const user = await User.findById(req.user.id).select("+password");
+
+  if (!user) {
+    return next(new ErrorHandler("User not found.", 404));
+  }
+
+  if (name) user.name = name;
+  if (phone) user.phone = phone;
+  if (universityId) user.universityId = universityId;
+
+  if (password) {
+    user.password = password;
+  }
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Profile updated successfully.",
+    user,
+  });
+});
+
+export const updateProfilePicture = catchAsyncError(async (req, res, next) => {
+  if (!req.file) {
+    return next(new ErrorHandler("No image file provided.", 400));
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    return next(new ErrorHandler("User not found.", 404));
+  }
+
+  try {
+    const result = await uploadToCloudinary(
+      req.file.buffer,
+      "profile_pictures"
+    );
+
+    user.profilePicture = result.secure_url;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile picture updated successfully.",
+      profilePictureUrl: user.profilePicture,
+    });
+  } catch (error) {
+    return next(new ErrorHandler("Image upload failed.", 500));
+  }
 });
