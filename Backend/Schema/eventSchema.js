@@ -38,6 +38,12 @@ const eventSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    attendedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     registrationDeadline: {
       type: Date,
       required: [true, "Registration deadline is required"],

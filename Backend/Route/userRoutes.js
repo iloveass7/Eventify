@@ -9,8 +9,11 @@ import {
   resetPassword,
   editUser,
   updateProfilePicture,
+  getAllUsers,
 } from "../Controller/userController.js";
 import { isAuthenticated } from "../Middleware/auth.js";
+import upload from "../Middleware/multer.js";
+import { isAdmin } from "../Middleware/adminAuth.js";
 
 const router = express.Router();
 
@@ -25,5 +28,6 @@ router.route("/me/update").put(isAuthenticated, editUser);
 router
   .route("/me/update/picture")
   .put(isAuthenticated, upload.single("profileImage"), updateProfilePicture);
+router.route("/admin/users").get(isAuthenticated, isAdmin, getAllUsers);
 
 export default router;

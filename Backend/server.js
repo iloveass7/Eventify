@@ -9,6 +9,7 @@ import connectCloudinary from "./Config/cloudinary.js";
 
 import userRouter from "./Route/userRoutes.js";
 import eventRouter from "./Route/eventRoutes.js";
+import adminRouter from "./Route/adminRoutes.js";
 
 config();
 const PORT = process.env.PORT || 8000;
@@ -32,6 +33,9 @@ app.listen(PORT, () => {
 connectDb();
 connectCloudinary();
 removeUnverifiedAccounts();
+
 app.use("/api/user", userRouter);
 app.use("/api/event", eventRouter);
+app.use("/api/admin", adminRouter);
+
 app.use(errorMiddleware);

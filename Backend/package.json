@@ -26,6 +26,8 @@
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.5",
+    "path": "^0.12.7",
+    "pdfkit": "^0.17.1",
     "streamifier": "^0.1.1",
     "twilio": "^5.8.0"
   },
