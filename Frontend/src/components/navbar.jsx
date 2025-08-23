@@ -1,94 +1,92 @@
 import { useState } from "react";
+import { Menu, X } from "lucide-react";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <nav className="text-black w-full py-4 shadow-xs mx-auto">
-      <div className="container mx-auto flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Eventify</h1>
-        {/* Mobile menu button */}
-        <div
-          className="md:hidden cursor-pointer"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          {isOpen ? (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className="size-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18 18 6M6 6l12 12"
-              />
-            </svg>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className="size-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-              />
-            </svg>
-          )}
+    <nav className="bg-purple-900 text-white shadow-md sticky top-0 z-50 w-full">
+      <div className="max-w-8xl mx-auto px-6 md:px-24 lg:px-25 py-6 flex items-center">
+        {/* Logo */}
+        <div className="flex-1 flex justify-start">
+          <h1 className="text-[3.1rem] font-extrabold">Eventify</h1>
         </div>
-        <ul className="hidden md:flex space-x-4">
+
+        {/* Desktop Navigation Links */}
+        <ul className="hidden md:flex flex-1 justify-center gap-10 text-lg font-semibold lg:text-[1.4rem]">
           <li>
-            <a href="#" className="hover:font-semibold">
+            <a href="#" className="hover:text-purple-300 transition-colors">
               About
             </a>
           </li>
           <li>
-            <a href="#" className="hover:font-semibold">
+            <a href="#" className="hover:text-purple-300 transition-colors">
               Home
             </a>
           </li>
           <li>
-            <a href="#" className="hover:font-semibold">
+            <a href="#" className="hover:text-purple-300 transition-colors">
               Events
             </a>
           </li>
         </ul>
-        <ul className="hidden md:flex space-x-4">
-          <li>
-            <a href="#" className="hover:font-semibold">
-              Login
-            </a>
-          </li>
-          <li>
-            <a href="#" className="hover:font-semibold">
-              Sign Up
-            </a>
-          </li>
-        </ul>
+
+        {/* Right-side Actions - Login/Register Links */}
+        <div className="flex-1 flex justify-end items-center gap-6 md:gap-6 lg:gap-10">
+          <ul className="hidden md:flex space-x-6 text-lg font-semibold lg:text-[1.4rem]">
+            <li>
+              <a href="#" className="hover:text-purple-300 transition-colors">
+                Login
+              </a>
+            </li>
+            <li>
+              <a href="#" className="hover:text-purple-300 transition-colors">
+                Sign Up
+              </a>
+            </li>
+          </ul>
+
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="md:hidden"
+          >
+            {isOpen ? <X size={32} /> : <Menu size={32} />}
+          </button>
+        </div>
       </div>
-      {/* Mobile menu */}
-      <div className="md:hidden h-screen w-screen z-20 ">
-        {isOpen && (
-          <div className="flex flex-col space-y-4">
-            <a href="#" className="hover:font-semibold">
-              About
-            </a>
-            <a href="#" className="hover:font-semibold">
-              Home
-            </a>
-            <a href="#" className="hover:font-semibold">
-              Events
-            </a>
-          </div>
-        )}
-      </div>
+
+      {/* Mobile Menu */}
+      {isOpen && (
+        <div className="md:hidden px-6 pt-8 pb-10 bg-purple-900">
+          <ul className="flex flex-col gap-6 text-2xl font-semibold">
+            <li>
+              <a href="#" onClick={() => setIsOpen(false)} className="hover:text-purple-300 transition-colors">
+                About
+              </a>
+            </li>
+            <li>
+              <a href="#" onClick={() => setIsOpen(false)} className="hover:text-purple-300 transition-colors">
+                Home
+              </a>
+            </li>
+            <li>
+              <a href="#" onClick={() => setIsOpen(false)} className="hover:text-purple-300 transition-colors">
+                Events
+              </a>
+            </li>
+            <li className="pt-4 border-t border-purple-700">
+              <a href="#" onClick={() => setIsOpen(false)} className="hover:text-purple-300 transition-colors">
+                Login
+              </a>
+            </li>
+            <li>
+              <a href="#" onClick={() => setIsOpen(false)} className="hover:text-purple-300 transition-colors">
+                Sign Up
+              </a>
+            </li>
+          </ul>
+        </div>
+      )}
     </nav>
   );
 }

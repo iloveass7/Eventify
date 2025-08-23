@@ -1,7 +1,16 @@
-export default function Home() {
+import React from 'react';
+import Hero from '../components/Hero';
+import Sponsors from '../components/Sponsors';
+import RecommendedEvents from '../components/RecommendedEvents';
+
+const Home = () => {
   return (
     <div>
-      <h1>Welcome to Eventify</h1>
+      <Hero />
+      <Sponsors />
+      <RecommendedEvents />
     </div>
   );
-}
+};
+
+export default Home;
