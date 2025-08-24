@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../../components/ThemeContext";
 import { Link } from "react-router-dom";
+import { API_BASE } from "../../config/api";
 
 const GenerateCertificate = () => {
   const { isDarkMode } = useTheme();
@@ -13,7 +14,7 @@ const GenerateCertificate = () => {
     const fetchAttendedEvents = async () => {
       try {
         const response = await fetch(
-          "http://localhost:7000/api/user/me/attended-events",
+          `${API_BASE}/api/user/me/attended-events`,
           {
             credentials: "include", // Send the auth cookie
           }
@@ -37,7 +38,7 @@ const GenerateCertificate = () => {
     setDownloadingId(eventId);
     try {
       const response = await fetch(
-        `http://localhost:7000/api/event/${eventId}/certificate`,
+        `${API_BASE}/api/event/${eventId}/certificate`,
         {
           credentials: "include",
         }
@@ -117,14 +118,12 @@ const GenerateCertificate = () => {
                   : "bg-white border-gray-300"
               }`}
             >
-
               <img
                 src={event.image}
                 alt="Event"
                 className="w-full h-48 object-cover"
               />
               <div className="p-6 flex flex-col flex-grow">
-
                 <h3
                   className={`text-2xl font-bold mb-2 break-words ${
                     isDarkMode ? "text-purple-300" : "text-purple-800"
