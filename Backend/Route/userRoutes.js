@@ -11,6 +11,8 @@ import {
   updateProfilePicture,
   getAllUsers,
   changePassword,
+  getMyRegisteredEvents,
+  getMyAttendedEvents,
 } from "../Controller/userController.js";
 import { isAuthenticated } from "../Middleware/auth.js";
 import upload from "../Middleware/multer.js";
@@ -31,4 +33,8 @@ router
   .put(isAuthenticated, upload.single("profileImage"), updateProfilePicture);
 router.route("/admin/users").get(isAuthenticated, isAdmin, getAllUsers);
 router.route("/change-password").put(isAuthenticated, changePassword);
+router
+  .route("/me/registered-events")
+  .get(isAuthenticated, getMyRegisteredEvents);
+router.route("/me/attended-events").get(isAuthenticated, getMyAttendedEvents);
 export default router;

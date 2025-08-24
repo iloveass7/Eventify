@@ -6,6 +6,7 @@ import twilio from "twilio";
 import { sendToken } from "../Utils/sendToken.js";
 import crypto from "crypto";
 import { uploadToCloudinary } from "../Utils/cloudinary.js";
+import Event from "../Schema/eventSchema.js";
 
 const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -468,5 +469,29 @@ export const getAllUsers = catchAsyncError(async (req, res, next) => {
     success: true,
     count: users.length,
     users,
+  });
+});
+export const getMyRegisteredEvents = catchAsyncError(async (req, res, next) => {
+  // Find all events where the 'attendees' array contains the current user's ID
+  const events = await Event.find({ attendees: req.user._id }).sort({
+    startTime: 1,
+  });
+
+  res.status(200).json({
+    success: true,
+    events,
+  });
+});
+export const getMyAttendedEvents = catchAsyncError(async (req, res, next) => {
+  const now = new Date();
+  // Find past events where the 'attendedBy' array includes the current user's ID
+  const events = await Event.find({
+    attendedBy: req.user._id,
+    endTime: { $lt: now },
+  }).sort({ endTime: -1 });
+
+  res.status(200).json({
+    success: true,
+    events,
   });
 });
