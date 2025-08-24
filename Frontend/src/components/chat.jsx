@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { MessageCircle, X, Send, Bot, User } from "lucide-react";
+import { API_BASE } from "../config/api";
 
 const Chat = ({ isDarkMode = false }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,7 +27,7 @@ const Chat = ({ isDarkMode = false }) => {
   const sendMessage = async (message) => {
     setIsLoading(true);
     try {
-      const res = await fetch("http://localhost:7000/api/chatbot/chat", {
+      const res = await fetch(`${API_BASE}/api/chatbot/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),

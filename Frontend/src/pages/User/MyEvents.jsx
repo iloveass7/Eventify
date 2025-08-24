@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../../components/ThemeContext";
 import { Link } from "react-router-dom";
+import { API_BASE } from "../../config/api";
 
 const MyEvents = () => {
   const { isDarkMode } = useTheme();
@@ -13,7 +14,7 @@ const MyEvents = () => {
     const fetchMyEvents = async () => {
       try {
         const response = await fetch(
-          "http://localhost:7000/api/user/me/registered-events",
+          `${API_BASE}/api/user/me/registered-events`,
           {
             credentials: "include", // Send the auth cookie
           }
@@ -40,7 +41,7 @@ const MyEvents = () => {
       setUnregisterLoadingId(eventId);
       try {
         const response = await fetch(
-          `http://localhost:7000/api/event/${eventId}/unregister`,
+          `${API_BASE}/api/event/${eventId}/unregister`,
           {
             method: "POST",
             credentials: "include",
@@ -91,14 +92,6 @@ const MyEvents = () => {
 
   return (
     <div className="px-6 py-4">
-      {" "}
-      <h1
-        className={`text-4xl font-bold mb-8 text-center ${
-          isDarkMode ? "text-gray-200" : "text-gray-800"
-        }`}
-      >
-        My Registered Events
-      </h1>{" "}
       {registeredEvents.length === 0 ? (
         <div className="text-center py-12">
           {" "}

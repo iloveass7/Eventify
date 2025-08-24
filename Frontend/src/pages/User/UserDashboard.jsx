@@ -29,6 +29,10 @@ const UserDashboard = () => {
     navigate("/login");
   };
 
+  const handleBackToHome = () => {
+    navigate("/");
+  };
+
   // Simulate loading delay
   useEffect(() => {
     const timeout = setTimeout(() => setLoading(false), 600);
@@ -83,15 +87,24 @@ const UserDashboard = () => {
           ))}
         </div>
 
-        {/* Logout Button */}
-        <div className="mt-6">
+        {/* Navigation Buttons */}
+        <div className="space-y-3">
+          {/* Back to Home Button */}
+          <button
+            onClick={handleBackToHome}
+            className={`w-full py-3 rounded-lg text-xl font-medium flex items-center justify-center transition-colors duration-200 ${
+              isDarkMode
+                ? "bg-purple-700 hover:bg-purple-500 text-white"
+                : "bg-purple-700 hover:bg-purple-500 text-white"
+            }`}
+          >
+            Back to Home
+          </button>
+          
+          {/* Logout Button */}
           <button
             onClick={handleLogout}
-            className={`w-full py-3 rounded text-xl font-bold flex items-center justify-center transition-colors duration-200 ${
-              isDarkMode
-                ? "bg-gray-700 hover:bg-gray-600 text-gray-100"
-                : "bg-purple-800 hover:bg-purple-700 text-white"
-            }`}
+            className="w-full py-3 rounded-lg text-xl font-bold flex items-center justify-center transition-colors duration-200 bg-red-600 hover:bg-red-500 text-white"
           >
             Logout
           </button>

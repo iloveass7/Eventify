@@ -85,39 +85,29 @@ const GenerateCertificate = () => {
 
   return (
     <div className="px-6 py-4">
-      <h1
-        className={`text-4xl font-bold mb-8 text-center ${
-          isDarkMode ? "text-gray-200" : "text-gray-800"
-        }`}
-      >
-        My Certificates
-      </h1>{" "}
       {completedEvents.length === 0 ? (
-        <div className="text-center py-12">
-          {" "}
+        <div className="text-center py-12 h-auto">
           <p
-            className={`text-xl ${
+            className={`text-2xl mt-5 ${
               isDarkMode ? "text-gray-400" : "text-gray-500"
             }`}
           >
-             You have no certificates available to download.{" "}
+            You have no certificates available to download.
           </p>
           <Link to="/events">
-            {" "}
             <button
-              className={`mt-4 px-6 py-2 rounded font-medium transition-colors duration-200 ${
+              className={`mt-10 px-6 py-2 rounded font-medium transition-colors duration-200 ${
                 isDarkMode
                   ? "bg-purple-600 hover:bg-purple-700 text-white"
                   : "bg-purple-700 hover:bg-purple-800 text-white"
               }`}
             >
-              Browse Events{" "}
+              Browse Events
             </button>
-          </Link>{" "}
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {" "}
           {completedEvents.map((event) => (
             <div
               key={event._id}
@@ -127,20 +117,20 @@ const GenerateCertificate = () => {
                   : "bg-white border-gray-300"
               }`}
             >
-              {" "}
+
               <img
                 src={event.image}
                 alt="Event"
                 className="w-full h-48 object-cover"
               />
               <div className="p-6 flex flex-col flex-grow">
-                {" "}
+
                 <h3
                   className={`text-2xl font-bold mb-2 break-words ${
                     isDarkMode ? "text-purple-300" : "text-purple-800"
                   }`}
                 >
-                  {event.name}{" "}
+                  {event.name}
                 </h3>
                 <p
                   className={`text-sm mb-4 ${
@@ -171,11 +161,11 @@ const GenerateCertificate = () => {
                     )}
                   </button>
                 </div>
-              </div>{" "}
+              </div>
             </div>
-          ))}{" "}
+          ))}
         </div>
-      )}{" "}
+      )}
     </div>
   );
 };

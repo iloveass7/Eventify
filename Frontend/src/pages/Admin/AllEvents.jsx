@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { API_BASE } from "../../config/api";
 
 const AllEvents = () => {
   const [showAll, setShowAll] = useState(false);
@@ -11,7 +12,7 @@ const AllEvents = () => {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const response = await fetch("http://localhost:7000/api/event/all");
+        const response = await fetch(`${API_BASE}/api/event/all`);
         const data = await response.json();
 
         if (response.ok) {
@@ -29,6 +30,24 @@ const AllEvents = () => {
 
     fetchEvents();
   }, []);
+
+  // Helper functions to format dates and times (matching ManageEvents component)
+  const formatDate = (dateString) => {
+    if (!dateString) return "Date TBA";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return "Time TBA";
+    return new Date(dateString).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   // Determine which events to show
   const eventsToShow = showAll ? events : events.slice(0, 4);
@@ -53,7 +72,15 @@ const AllEvents = () => {
   if (error) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <p className="text-red-500">{error}</p>
+        <div className="text-center">
+          <p className="text-red-500 text-lg mb-2">⚠️ {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
@@ -97,26 +124,24 @@ const AllEvents = () => {
                     event.image ||
                     "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
                   }
-                  alt={event.name}
+                  alt={event.name || "Event"}
                   className="w-full sm:w-48 h-48 object-cover rounded-lg"
                 />
 
                 <div className="flex flex-col justify-between w-full">
                   <div>
-                    <h3 className="text-xl sm:text-2xl font-bold mb-2 text-purple-800 break-words">
-                      {event.name}
+                    <h3 className="text-xl sm:text-2xl font-bold mb-3 text-purple-800 break-words">
+                      {event.name || "Untitled Event"}
                     </h3>
 
                     <p className="text-gray-700 mb-2 text-md">
                       <span className="font-semibold">Date:</span>{" "}
-                      {event.date
-                        ? new Date(event.date).toLocaleDateString()
-                        : "TBA"}
+                      {formatDate(event.startTime)}
                     </p>
 
                     <p className="text-gray-700 mb-2 text-md">
                       <span className="font-semibold">Location:</span>{" "}
-                      {event.location || "Location TBA"}
+                      {event.venue || "Location TBA"}
                     </p>
 
                     <p
@@ -137,7 +162,7 @@ const AllEvents = () => {
                   <div className="flex justify-end mt-4">
                     <Link
                       to={`/events/${event._id || event.id}`}
-                      className="bg-purple-700 text-white px-6 py-2 font-semibold text-lg rounded hover:bg-purple-800 transition"
+                      className="bg-purple-700 text-white px-6 py-2 font-semibold text-lg rounded hover:bg-purple-800 transition-colors duration-200"
                     >
                       View Details
                     </Link>
@@ -154,14 +179,14 @@ const AllEvents = () => {
           {!showAll ? (
             <button
               onClick={handleShowMore}
-              className="bg-purple-700 text-white px-8 py-3 rounded font-semibold hover:bg-purple-800 transition"
+              className="bg-purple-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-purple-800 transition-colors duration-200 shadow-md hover:shadow-lg"
             >
               Show More Events ({events.length - 4} more)
             </button>
           ) : (
             <button
               onClick={handleShowLess}
-              className="bg-gray-600 text-white px-8 py-2 rounded font-semibold hover:bg-gray-700 transition"
+              className="bg-gray-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-colors duration-200 shadow-md hover:shadow-lg"
             >
               Show Less
             </button>

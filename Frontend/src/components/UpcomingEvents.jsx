@@ -1,4 +1,4 @@
-// UpcomingEvents.jsx - Updated with API Integration and Registration
+// UpcomingEvents.jsx - Fixed Authentication Issues
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CheckCircle,
 } from "lucide-react";
+import { API_BASE } from "../config/api";
 
 const UpcomingEvents = ({ isDarkMode }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -20,12 +21,48 @@ const UpcomingEvents = ({ isDarkMode }) => {
   const [registering, setRegistering] = useState({});
   const navigate = useNavigate();
 
+  // Helper function to normalize tags
+  const parseJSONSafe = (str) => {
+    try {
+      return JSON.parse(str);
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizeTags = (raw) => {
+    const cleanOne = (t) =>
+      String(t ?? "")
+        .trim()
+        .replace(/^#/, "")
+        .replace(/^"|"$/g, "")
+        .toLowerCase();
+
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.flatMap((item) => normalizeTags(item));
+
+    let s = String(raw).trim();
+    s = s.replace(/^#/, "");
+
+    // Looks like an array: ["tag","tag2"]
+    if (/^\s*\[.*\]\s*$/.test(s)) {
+      const arr = parseJSONSafe(s);
+      return Array.isArray(arr) ? arr.map(cleanOne).filter(Boolean) : [];
+    }
+
+    // Fallback split on commas & whitespace
+    return s
+      .split(/[,\s]+/)
+      .map(cleanOne)
+      .filter(Boolean);
+  };
+
   // Fetch upcoming events and user data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch user data
-        const userRes = await fetch("http://localhost:7000/api/user/me", {
+        // Fetch user data using cookies (consistent with login approach)
+        const userRes = await fetch(`${API_BASE}/api/user/me`, {
           credentials: "include",
         });
 
@@ -37,9 +74,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
         }
 
         // Fetch upcoming events
-        const eventsRes = await fetch(
-          "http://localhost:7000/api/event/upcoming"
-        );
+        const eventsRes = await fetch(`${API_BASE}/api/event/upcoming`);
         const eventsData = await eventsRes.json();
 
         if (eventsData.success) {
@@ -63,7 +98,6 @@ const UpcomingEvents = ({ isDarkMode }) => {
               maxAttendees: 500,
               organizer: { name: "Night Events Co." },
             },
-            // Add more sample events if needed
           ]);
         }
       } catch (err) {
@@ -129,15 +163,25 @@ const UpcomingEvents = ({ isDarkMode }) => {
     setRegistering((prev) => ({ ...prev, [eventId]: true }));
 
     try {
+      // Try multiple authentication methods
       const token = localStorage.getItem("token");
+      
+      // Prepare headers - try both cookie and token authentication
+      const headers = {
+        "Content-Type": "application/json",
+      };
+      
+      // Add Authorization header only if token exists
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const res = await fetch(
-        `http://localhost:7000/api/event/${eventId}/register`,
+        `${API_BASE}/api/event/${eventId}/register`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: headers,
+          credentials: "include", // This ensures cookies are sent
         }
       );
 
@@ -153,7 +197,13 @@ const UpcomingEvents = ({ isDarkMode }) => {
           )
         );
       } else {
-        alert(data.message || "Registration failed");
+        // Handle specific authentication errors
+        if (res.status === 401 || res.status === 403) {
+          alert("Please log in again to register for events");
+          navigate("/login");
+        } else {
+          alert(data.message || "Registration failed");
+        }
       }
     } catch (err) {
       console.error("Error registering:", err);
@@ -316,13 +366,13 @@ const UpcomingEvents = ({ isDarkMode }) => {
 
                   {/* Content */}
                   <div
-                    className={`p-8 flex flex-col justify-between w-full md:w-3/5 transition-colors duration-500 ${
+                    className={`p-6 flex flex-col justify-between h-full w-full md:w-3/5 transition-colors duration-500 ${
                       isDarkMode
                         ? "bg-gradient-to-br from-gray-800 to-gray-700"
                         : "bg-gradient-to-br from-white to-purple-50"
                     }`}
                   >
-                    <div>
+                    <div className="flex-1 overflow-hidden ">
                       {/* Header */}
                       <div className="mb-4">
                         <h3
@@ -335,7 +385,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
                       </div>
 
                       <p
-                        className={`text-lg mb-6 leading-relaxed transition-colors duration-500 ${
+                        className={`text-lg mb-14 leading-relaxed transition-colors duration-500 line-clamp-3 ${
                           isDarkMode ? "text-gray-300" : "text-gray-600"
                         }`}
                       >
@@ -343,24 +393,24 @@ const UpcomingEvents = ({ isDarkMode }) => {
                       </p>
 
                       {/* Event Details Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                      <div className="grid grid-cols-1 text-lg sm:grid-cols-2 gap-4 mb-5">
                         {/* Date & Time */}
                         <div
-                          className={`flex items-center gap-3 p-3 rounded-lg shadow-sm transition-colors duration-500 ${
+                          className={`flex items-center gap-3 p-3 rounded-xl shadow-sm transition-colors duration-500 ${
                             isDarkMode ? "bg-gray-700" : "bg-white"
                           }`}
                         >
                           <Calendar className="w-5 h-5 text-purple-600" />
                           <div>
                             <div
-                              className={`text-sm transition-colors duration-500 ${
+                              className={`text-sm font-medium transition-colors duration-500 ${
                                 isDarkMode ? "text-gray-400" : "text-gray-500"
                               }`}
                             >
                               Date
                             </div>
                             <div
-                              className={`font-semibold transition-colors duration-500 ${
+                              className={`font-bold text-sm transition-colors duration-500 ${
                                 isDarkMode ? "text-gray-200" : "text-gray-900"
                               }`}
                             >
@@ -370,21 +420,21 @@ const UpcomingEvents = ({ isDarkMode }) => {
                         </div>
 
                         <div
-                          className={`flex items-center gap-3 p-3 rounded-lg shadow-sm transition-colors duration-500 ${
+                          className={`flex items-center gap-3 p-3 rounded-xl shadow-sm transition-colors duration-500 ${
                             isDarkMode ? "bg-gray-700" : "bg-white"
                           }`}
                         >
                           <Clock className="w-5 h-5 text-purple-600" />
                           <div>
                             <div
-                              className={`text-sm transition-colors duration-500 ${
+                              className={`text-sm font-medium transition-colors duration-500 ${
                                 isDarkMode ? "text-gray-400" : "text-gray-500"
                               }`}
                             >
                               Time
                             </div>
                             <div
-                              className={`font-semibold transition-colors duration-500 ${
+                              className={`font-bold text-sm transition-colors duration-500 ${
                                 isDarkMode ? "text-gray-200" : "text-gray-900"
                               }`}
                             >
@@ -395,21 +445,21 @@ const UpcomingEvents = ({ isDarkMode }) => {
 
                         {/* Location */}
                         <div
-                          className={`flex items-center gap-3 p-3 rounded-lg shadow-sm sm:col-span-2 transition-colors duration-500 ${
+                          className={`flex items-center gap-3 p-3 rounded-xl shadow-sm sm:col-span-2 transition-colors duration-500 ${
                             isDarkMode ? "bg-gray-700" : "bg-white"
                           }`}
                         >
                           <MapPin className="w-5 h-5 text-purple-600" />
                           <div>
                             <div
-                              className={`text-sm transition-colors duration-500 ${
+                              className={`text-sm font-medium transition-colors duration-500 ${
                                 isDarkMode ? "text-gray-400" : "text-gray-500"
                               }`}
                             >
                               Location
                             </div>
                             <div
-                              className={`font-semibold transition-colors duration-500 ${
+                              className={`font-bold text-sm transition-colors duration-500 ${
                                 isDarkMode ? "text-gray-200" : "text-gray-900"
                               }`}
                             >
@@ -421,51 +471,32 @@ const UpcomingEvents = ({ isDarkMode }) => {
 
                       {/* Attendees Section */}
                       <div
-                        className={`p-4 rounded-lg shadow-sm mb-6 transition-colors duration-500 ${
+                        className={`flex items-center gap-3 p-3 rounded-xl shadow-sm mb-5 transition-colors duration-500 ${
                           isDarkMode ? "bg-gray-700" : "bg-white"
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Users className="w-5 h-5 text-purple-600" />
-                            <span
-                              className={`text-sm transition-colors duration-500 ${
-                                isDarkMode ? "text-gray-400" : "text-gray-500"
-                              }`}
-                            >
-                              Attendees
-                            </span>
+                        <Users className="w-5 h-5 text-purple-600" />
+                        <div>
+                          <div
+                            className={`text-sm font-medium transition-colors duration-500 ${
+                              isDarkMode ? "text-gray-400" : "text-gray-500"
+                            }`}
+                          >
+                            Attendees
                           </div>
-                          <span
-                            className={`text-sm font-semibold transition-colors duration-500 ${
+                          <div
+                            className={`text-lg font-bold transition-colors duration-500 ${
                               isDarkMode ? "text-gray-200" : "text-gray-900"
                             }`}
                           >
-                            {event.attendees.length} / {event.maxAttendees}
-                          </span>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div
-                          className={`w-full rounded-full h-2 transition-colors duration-500 ${
-                            isDarkMode ? "bg-gray-600" : "bg-gray-200"
-                          }`}
-                        >
-                          <div
-                            className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-500"
-                            style={{
-                              width: `${getAttendancePercentage(
-                                event.attendees,
-                                event.maxAttendees
-                              )}%`,
-                            }}
-                          ></div>
+                            {event.attendees.length}
+                          </div>
                         </div>
                       </div>
 
                       {/* Tags */}
-                      <div className="flex flex-wrap gap-2 mb-6">
-                        {event.tags?.map((tag, idx) => (
+                      <div className="flex flex-wrap gap-2 mb-5">
+                        {normalizeTags(event.tags)?.slice(0, 3).map((tag, idx) => (
                           <span
                             key={idx}
                             className={`px-3 py-1 rounded-full text-sm font-medium transition-colors duration-300 ${
@@ -474,18 +505,29 @@ const UpcomingEvents = ({ isDarkMode }) => {
                                 : "bg-purple-100 text-purple-700 hover:bg-purple-200"
                             }`}
                           >
-                            #{tag}
+                            {tag}
                           </span>
                         ))}
+                        {normalizeTags(event.tags)?.length > 3 && (
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              isDarkMode
+                                ? "bg-gray-700 text-gray-300"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            +{normalizeTags(event.tags).length - 3} more
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
+                    {/* Action Buttons - Fixed at bottom */}
+                    <div className="flex gap-4 mt-auto pt-4">
                       {registered ? (
-                        <div className="flex items-center gap-2 bg-green-100 text-green-800 px-4 py-3 rounded-full flex-1">
+                        <div className="flex items-center gap-3 bg-green-100 text-green-800 px-6 py-3 rounded-2xl flex-1 shadow-sm">
                           <CheckCircle className="w-5 h-5" />
-                          <span className="font-medium">Registered</span>
+                          <span className="font-semibold text-base">Registered</span>
                         </div>
                       ) : (
                         <button
@@ -495,7 +537,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
                             isFull ||
                             registrationClosed
                           }
-                          className="bg-purple-600 text-white px-8 py-3 rounded-full hover:bg-purple-700 transition-all duration-300 text-lg font-medium flex-1 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="bg-purple-600 text-white px-8 py-3 rounded-2xl hover:bg-purple-700 transition-all duration-300 text-lg font-semibold flex-1 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {registering[event._id]
                             ? "Processing..."
@@ -503,19 +545,9 @@ const UpcomingEvents = ({ isDarkMode }) => {
                             ? "Event Full"
                             : registrationClosed
                             ? "Registration Closed"
-                            : "Join Now!"}
+                            : "Register Now!"}
                         </button>
                       )}
-                      {/* <Link
-                        to={`/events/${event._id}`}
-                        className={`px-6 py-3 rounded-full border-2 border-purple-600 font-medium transition-all duration-300 ${
-                          isDarkMode
-                            ? "bg-gray-800 text-purple-400 hover:bg-purple-600 hover:text-white"
-                            : "bg-white text-purple-600 hover:bg-purple-600 hover:text-white"
-                        }`}
-                      >
-                        Learn More
-                      </Link> */}
                     </div>
                   </div>
                 </div>

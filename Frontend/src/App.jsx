@@ -9,6 +9,8 @@ import RegisterPage from "./pages/RegisterPage";
 import LoginPage from "./pages/LoginPage";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
+import DarkModeToggle from "./components/DarkModeToggle";
+import Chat from "./components/chat";
 
 function App() {
   const navigate = useNavigate();
@@ -49,7 +51,8 @@ function App() {
             <Navbar />
           </>
         )}
-
+        <DarkModeToggle />
+        <Chat />
         <Routes>
           {/* Public Routes */}
           <Route path="/register" element={<RegisterPage />} />

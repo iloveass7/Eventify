@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE } from "../../config/api";
 
 const CreateEvents = () => {
   const [images, setImages] = useState([]);
@@ -64,7 +65,7 @@ const CreateEvents = () => {
         formData.append("image", images[0]);
       }
 
-      const response = await fetch("http://localhost:7000/api/event/create", {
+      const response = await fetch(`${API_BASE}/api/event/create`, {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -99,13 +100,10 @@ const CreateEvents = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4 py-8">
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4 ">
       {" "}
-      <div className="bg-white mx-2 px-10 p-8 rounded-lg shadow-lg w-full max-w-4xl">
+      <div className="bg-white mx-2 px-10 p-8 rounded-lg shadow-lg w-full max-w-8xl">
         {" "}
-        <h1 className="text-2xl font-bold text-center mb-6 text-purple-800">
-          Create New Event{" "}
-        </h1>{" "}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}{" "}

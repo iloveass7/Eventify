@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Search,
   Calendar,
@@ -10,37 +10,178 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
+  Hash,
 } from "lucide-react";
+import { API_BASE } from "../config/api";
+import { interestsData } from "../data/interests";
+
+/* ---------------- Helpers ---------------- */
+
+// safe JSON parse -> [] on failure
+const parseJSONSafe = (s) => {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return [];
+  }
+};
+
+// Normalize tags from various shapes into lowercase strings without leading '#'
+const normalizeTags = (raw) => {
+  const cleanOne = (t) =>
+    String(t ?? "")
+      .trim()
+      .replace(/^#/, "")
+      .replace(/^"|"$/g, "")
+      .toLowerCase();
+
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.flatMap((item) => normalizeTags(item));
+
+  let s = String(raw).trim();
+  s = s.replace(/^#/, "");
+
+  // Looks like an array: ["tag","tag2"]
+  if (/^\s*\[.*\]\s*$/.test(s)) {
+    const arr = parseJSONSafe(s);
+    return Array.isArray(arr) ? arr.map(cleanOne).filter(Boolean) : [];
+  }
+
+  // Fallback split on commas & whitespace
+  return s
+    .split(/[,\s]+/)
+    .map(cleanOne)
+    .filter(Boolean);
+};
+
+// Build quick maps between interest id <-> name
+const INTEREST_ID_BY_NAME = interestsData.reduce((acc, i) => {
+  acc[i.name.toLowerCase()] = i.id;
+  return acc;
+}, {});
+const INTEREST_NAME_BY_ID = interestsData.reduce((acc, i) => {
+  acc[i.id] = i.name;
+  return acc;
+}, {});
+const INTEREST_SET = new Set(interestsData.map((i) => i.id));
+
+// Derive a category id from tags or text
+const deriveCategoryId = (event) => {
+  const tags = normalizeTags(event.tags);
+  // exact match against interest ids (in case your tags already use ids)
+  const exact = tags.find((t) => INTEREST_SET.has(t));
+  if (exact) return exact;
+
+  // match against interest names (e.g., "Workshop", "Sports")
+  const nameMatch = tags.find((t) => INTEREST_ID_BY_NAME[t]);
+  if (nameMatch) return INTEREST_ID_BY_NAME[nameMatch];
+
+  // loose text search in name/description/venue/location
+  const haystack = (
+    [event.name, event.title, event.description, event.venue, event.location].join(" ") || ""
+  ).toLowerCase();
+
+  for (const { id, name } of interestsData) {
+    if (haystack.includes(id) || haystack.includes(name.toLowerCase())) {
+      return id;
+    }
+  }
+
+  return "other";
+};
+
+// Formatters
+const formatDate = (dateString) => {
+  if (!dateString) return "Date TBA";
+  const d = new Date(dateString);
+  return isNaN(d) ? "Date TBA" : d.toLocaleDateString("en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const formatTime = (dateString) => {
+  if (!dateString) return "Time TBA";
+  const d = new Date(dateString);
+  return isNaN(d)
+    ? "Time TBA"
+    : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
+const getCategoryPillColor = (categoryName) => {
+  const colors = {
+    Conference: "bg-blue-100 text-blue-800",
+    Workshop: "bg-purple-100 text-purple-800",
+    Seminar: "bg-green-100 text-green-800",
+    Networking: "bg-amber-100 text-amber-800",
+    Concert: "bg-pink-100 text-pink-800",
+    Festival: "bg-rose-100 text-rose-800",
+    Sports: "bg-emerald-100 text-emerald-800",
+    Exhibition: "bg-cyan-100 text-cyan-800",
+    Other: "bg-gray-100 text-gray-800",
+  };
+  return colors[categoryName] || "bg-gray-100 text-gray-800";
+};
+
+/* ---------------- Component ---------------- */
 
 const Events = () => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const categories = [
-    "All",
-    "Technology",
-    "Arts",
-    "Business",
-    "Environment",
-    "Cultural",
-    "Health",
-  ];
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
+
+  // categories for the sidebar: "All" + interest names
+  const categoryOptions = ["All", ...interestsData.map((i) => i.name)];
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("All"); // store as Name (not id) for UI
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState("date");
   const eventsPerPage = 6;
 
-  // Fetch upcoming events from backend
+  // Fetch all events (changed from upcoming to all)
   useEffect(() => {
     const fetchEvents = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch("http://localhost:7000/api/event/upcoming");
+        // Changed endpoint from /upcoming to /all
+        const res = await fetch(`${API_BASE}/api/event/all`);
         const data = await res.json();
-        setEvents(data?.events || []);
+        const list = Array.isArray(data?.events) ? data.events : [];
+
+        // normalize each event: tags -> clean array, categoryId + categoryName
+        const normalized = list.map((ev) => {
+          const tags = normalizeTags(ev.tags);
+          const categoryId = deriveCategoryId({ ...ev, tags });
+          const categoryName = INTEREST_NAME_BY_ID[categoryId] || "Other";
+
+          return {
+            ...ev,
+            tags,
+            _categoryId: categoryId,
+            _categoryName: categoryName,
+            // defensive fallbacks:
+            image: ev.image || "/placeholder-event.jpg",
+            startTime: ev.startTime || ev.time || ev.date || null,
+            endTime: ev.endTime || null,
+            venue: ev.venue || ev.location || "Location TBA",
+            attendees: Array.isArray(ev.attendees) ? ev.attendees : [],
+          };
+        });
+
+        setEvents(normalized);
+
+        // Optional: if user navigated via /events?tags=xxx, set search term from that
+        const tagsParam = searchParams.get("tags");
+        if (tagsParam && !searchTerm) {
+          setSearchTerm(tagsParam);
+        }
       } catch (err) {
         console.error("Error fetching events:", err);
         setError("Failed to load events. Please try again later.");
@@ -50,31 +191,36 @@ const Events = () => {
       }
     };
     fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Filter and search logic
+  // Filtering + search + sorting
   const filteredEvents = useMemo(() => {
     let filtered = events.filter((event) => {
+      const q = searchTerm.trim().toLowerCase();
+
       const matchesSearch =
-        event.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        event.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (event.organizer?.name || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase());
+        !q ||
+        event.name?.toLowerCase().includes(q) ||
+        event.description?.toLowerCase().includes(q) ||
+        (event.organizer?.name || "").toLowerCase().includes(q) ||
+        event.tags?.some((t) => t.includes(q));
 
       const matchesCategory =
         selectedCategory === "All" ||
-        event.tags?.includes(selectedCategory) ||
-        event.category === selectedCategory;
+        event._categoryName === selectedCategory;
 
       return matchesSearch && matchesCategory;
     });
 
-    // Sort events
+    // Sort
     filtered.sort((a, b) => {
       switch (sortBy) {
-        case "date":
-          return new Date(a.time || a.date) - new Date(b.time || b.date);
+        case "date": {
+          const aT = new Date(a.startTime).getTime() || 0;
+          const bT = new Date(b.startTime).getTime() || 0;
+          return aT - bT;
+        }
         case "popularity":
           return (b.attendees?.length || 0) - (a.attendees?.length || 0);
         case "alphabetical":
@@ -85,9 +231,9 @@ const Events = () => {
     });
 
     return filtered;
-  }, [searchTerm, selectedCategory, sortBy, events]);
+  }, [events, searchTerm, selectedCategory, sortBy]);
 
-  // Pagination logic
+  // Pagination
   const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
   const startIndex = (currentPage - 1) * eventsPerPage;
   const currentEvents = filteredEvents.slice(
@@ -100,27 +246,16 @@ const Events = () => {
     window.scrollTo(0, 0);
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "Date TBA";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+  // click on a tag chip sets the search param (and opens results)
+  const handleTagClick = (tag) => {
+    const val = tag.toLowerCase();
+    setSearchTerm(val);
+    setCurrentPage(1);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set("tags", val);
+      return p;
     });
-  };
-
-  const getCategoryColor = (category) => {
-    const colors = {
-      Technology: "bg-blue-100 text-blue-800",
-      Arts: "bg-purple-100 text-purple-800",
-      Business: "bg-green-100 text-green-800",
-      Environment: "bg-emerald-100 text-emerald-800",
-      Cultural: "bg-orange-100 text-orange-800",
-      Health: "bg-red-100 text-red-800",
-    };
-    return colors[category] || "bg-gray-100 text-gray-800";
   };
 
   if (loading) {
@@ -168,12 +303,19 @@ const Events = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search events, organizers, or keywords..."
+              placeholder="Search events, organizers, or tags..."
               className="h-12 sm:h-14 lg:h-16 w-full pl-10 pr-4 py-3 border border-purple-300 rounded-lg focus:ring-1 focus:ring-purple-500 focus:border-purple-900 text-sm sm:text-base"
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
+                // keep URL param in sync (optional)
+                setSearchParams((prev) => {
+                  const p = new URLSearchParams(prev);
+                  if (e.target.value) p.set("tags", e.target.value);
+                  else p.delete("tags");
+                  return p;
+                });
               }}
             />
           </div>
@@ -193,33 +335,26 @@ const Events = () => {
                 <span className="text-sm sm:text-base">Filters & Sort</span>
               </button>
 
-              <div
-                className={`${
-                  showFilters ? "block" : "hidden"
-                } lg:block space-y-4 sm:space-y-6`}
-              >
+              <div className={`${showFilters ? "block" : "hidden"} lg:block space-y-4 sm:space-y-6`}>
                 <div>
                   <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-900 mb-3 sm:mb-4">
                     Filter & Sort
                   </h3>
                 </div>
 
-                {/* Category Filter */}
+                {/* Category Filter (using interest names) */}
                 <div>
                   <label className="block text-sm sm:text-base lg:text-lg font-semibold text-purple-900 mb-3">
                     Category
                   </label>
                   <div className="space-y-2 sm:space-y-3">
-                    {categories.map((category) => (
-                      <label
-                        key={category}
-                        className="flex items-center cursor-pointer"
-                      >
+                    {categoryOptions.map((name) => (
+                      <label key={name} className="flex items-center cursor-pointer">
                         <input
                           type="radio"
                           name="category"
-                          value={category}
-                          checked={selectedCategory === category}
+                          value={name}
+                          checked={selectedCategory === name}
                           onChange={(e) => {
                             setSelectedCategory(e.target.value);
                             setCurrentPage(1);
@@ -227,16 +362,12 @@ const Events = () => {
                           className="w-4 h-4 text-purple-900 border-gray-300 focus:ring-purple-500"
                         />
                         <span className="ml-2 text-sm sm:text-base lg:text-lg text-gray-900">
-                          {category}
+                          {name}
                         </span>
                         <span className="ml-auto text-sm sm:text-base lg:text-lg text-gray-500">
-                          {category === "All"
+                          {name === "All"
                             ? events.length
-                            : events.filter(
-                                (e) =>
-                                  e.tags?.includes(category) ||
-                                  e.category === category
-                              ).length}
+                            : events.filter((ev) => ev._categoryName === name).length}
                         </span>
                       </label>
                     ))}
@@ -304,6 +435,11 @@ const Events = () => {
                     setSortBy("date");
                     setSearchTerm("");
                     setCurrentPage(1);
+                    setSearchParams((prev) => {
+                      const p = new URLSearchParams(prev);
+                      p.delete("tags");
+                      return p;
+                    });
                   }}
                   className="w-full px-4 py-2 sm:py-3 text-sm sm:text-base text-gray-600 border border-purple-200 rounded-lg hover:bg-purple-200 hover:text-purple-500 transition-colors"
                 >
@@ -319,15 +455,13 @@ const Events = () => {
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div>
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                  {filteredEvents.length} Event
-                  {filteredEvents.length !== 1 ? "s" : ""} Found
+                  {filteredEvents.length} Event{filteredEvents.length !== 1 ? "s" : ""} Found
                 </h2>
                 {(searchTerm || selectedCategory !== "All") && (
                   <p className="text-xs sm:text-sm text-gray-600 mt-1">
                     {searchTerm && `Search: "${searchTerm}"`}
                     {searchTerm && selectedCategory !== "All" && " • "}
-                    {selectedCategory !== "All" &&
-                      `Category: ${selectedCategory}`}
+                    {selectedCategory !== "All" && `Category: ${selectedCategory}`}
                   </p>
                 )}
               </div>
@@ -350,129 +484,93 @@ const Events = () => {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
                   {currentEvents.map((event) => (
-                    <div
-                      key={event._id || event.id}
-                      className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full"
-                    >
-                      {/* Event Image - Fixed Height */}
-                      <div className="relative flex-shrink-0">
-                        <img
-                          src={event.image || "/placeholder-event.jpg"}
-                          alt={event.name}
-                          className="w-full h-40 sm:h-48 object-cover rounded-t-lg"
-                        />
-                        {event.featured && (
-                          <div className="absolute top-2 sm:top-3 left-2 sm:left-3">
-                            <span className="bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                              <Star className="w-3 h-3 fill-current" />
-                              Featured
-                            </span>
-                          </div>
-                        )}
-                        <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(
-                              event.category || "Other"
-                            )}`}
-                          >
-                            {event.category || "Event"}
-                          </span>
-                        </div>
-                      </div>
+<div
+  key={event._id || event.id}
+  className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-shadow flex flex-col h-full overflow-hidden border border-gray-200"
+>
+  {/* Event Image */}
+  <div className="relative w-full h-48">
+    <img
+      src={event.image || "/placeholder-event.jpg"}
+      alt={event.name}
+      className="w-full h-full object-cover"
+    />
+    {/* Category Badge */}
+    <div className="absolute top-3 right-3">
+      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+        {event.tags || "Event"}
+      </span>
+    </div>
+  </div>
 
-                      {/* Event Content - Flexible Height */}
-                      <div className="p-4 sm:p-6 flex flex-col flex-grow">
-                        {/* Title - Fixed Height */}
-                        <div className="h-12 sm:h-14 mb-2 sm:mb-3">
-                          <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 line-clamp-2 leading-tight">
-                            {event.name}
-                          </h3>
-                        </div>
+  {/* Event Content */}
+  <div className="flex flex-col flex-grow p-6 space-y-4">
+    {/* Title */}
+    <h3 className="text-xl font-bold text-gray-900 line-clamp-2">
+      {event.name}
+    </h3>
 
-                        {/* Description - Fixed Height */}
-                        <div className="h-16 sm:h-20 mb-3 sm:mb-4">
-                          <p className="text-sm sm:text-base text-gray-600 line-clamp-3 leading-relaxed">
-                            {event.description}
-                          </p>
-                        </div>
+    {/* Description */}
+    <p className="text-lg text-gray-600 line-clamp-3 leading-relaxed">
+      {event.description}
+    </p>
 
-                        {/* Event Details - Fixed Height */}
-                        <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4 flex-shrink-0">
-                          <div className="flex items-center text-xs sm:text-sm text-gray-600">
-                            <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0" />
-                            <span className="truncate">
-                              {formatDate(event.date || event.time)}
-                            </span>
-                          </div>
-                          <div className="flex items-center text-xs sm:text-sm text-gray-600">
-                            <Clock className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0" />
-                            <span className="truncate">
-                              {event.time
-                                ? new Date(event.time).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
-                                : "Time TBA"}
-                            </span>
-                          </div>
-                          <div className="flex items-center text-xs sm:text-sm text-gray-600">
-                            <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0" />
-                            <span className="truncate">
-                              {event.location || "Location TBA"}
-                            </span>
-                          </div>
-                          <div className="flex items-center text-xs sm:text-sm text-gray-600">
-                            <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0" />
-                            <span className="truncate">
-                              {event.attendees?.length || 0} registered
-                              {event.maxAttendees
-                                ? ` / ${event.maxAttendees}`
-                                : ""}
-                            </span>
-                          </div>
-                        </div>
+    {/* Event Details */}
+    <div className="space-y-2 text-lg text-gray-600">
+      <div className="flex items-center gap-2">
+        <Calendar className="w-4 h-4 text-purple-600 flex-shrink-0" />
+        <span>{formatDate(event.startTime || event.date)}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Clock className="w-4 h-4 text-purple-600 flex-shrink-0" />
+        <span>
+          {event.startTime
+            ? new Date(event.startTime).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "Time TBA"}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <MapPin className="w-4 h-4 text-purple-600 flex-shrink-0" />
+        <span>{event.venue || event.location || "Location TBA"}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Users className="w-4 h-4 text-purple-600 flex-shrink-0" />
+        <span>
+          {event.attendees?.length || 0} registered
+          {event.maxAttendees ? ` / ${event.maxAttendees}` : ""}
+        </span>
+      </div>
+    </div>
 
-                        {/* Registration Progress - Fixed Height */}
-                        {event.maxAttendees && (
-                          <div className="mb-4 sm:mb-6 flex-shrink-0">
-                            <div className="flex justify-between text-xs sm:text-sm text-gray-600 mb-1">
-                              <span>Registration Progress</span>
-                              <span>
-                                {Math.round(
-                                  ((event.attendees?.length || 0) /
-                                    event.maxAttendees) *
-                                    100
-                                )}
-                                %
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-purple-700 h-2 rounded-full transition-all duration-300"
-                                style={{
-                                  width: `${Math.min(
-                                    ((event.attendees?.length || 0) /
-                                      event.maxAttendees) *
-                                      100,
-                                    100
-                                  )}%`,
-                                }}
-                              ></div>
-                            </div>
-                          </div>
-                        )}
+    {/* Tags */}
+    {event.tags && event.tags.length > 0 && (
+      <div className="flex flex-wrap gap-2 pt-2">
+        {event.tags.map((tag, idx) => (
+          <span
+            key={idx}
+            className="px-2 py-1 text-sm rounded-full bg-purple-50 text-purple-700 font-medium"
+          >
+            #{tag}
+          </span>
+        ))}
+      </div>
+    )}
 
-                        {/* Action Button - Fixed Position at Bottom */}
-                        <div className="mt-auto">
-                          <Link
-                            to={`/events/${event._id || event.id}`}
-                            className="w-full bg-purple-600 text-white py-2 sm:py-3 px-4 sm:px-6 text-sm sm:text-base lg:text-lg rounded-lg hover:bg-purple-900 transition-colors font-medium text-center block"
-                          >
-                            View Details
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
+    {/* Action Button */}
+    <div className="mt-auto pt-4">
+      <Link
+        to={`/events/${event._id || event.id}`}
+        className="w-full block text-center bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-semibold transition-colors"
+      >
+        View Details
+      </Link>
+    </div>
+  </div>
+</div>
+
                   ))}
                 </div>
 
@@ -489,21 +587,19 @@ const Events = () => {
                     </button>
 
                     <div className="flex gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                        (page) => (
-                          <button
-                            key={page}
-                            onClick={() => handlePageChange(page)}
-                            className={`px-2 sm:px-3 py-2 rounded-lg text-sm sm:text-base ${
-                              currentPage === page
-                                ? "bg-purple-800 text-white"
-                                : "border border-gray-300 hover:bg-gray-50"
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        )
-                      )}
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          className={`px-2 sm:px-3 py-2 rounded-lg text-sm sm:text-base ${
+                            currentPage === page
+                              ? "bg-purple-800 text-white"
+                              : "border border-gray-300 hover:bg-gray-50"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
                     </div>
 
                     <button

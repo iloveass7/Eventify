@@ -4,7 +4,7 @@ import Event from "../Schema/eventSchema.js";
 import { uploadToCloudinary } from "../Utils/cloudinary.js";
 import PDFDocument from "pdfkit";
 
-// No changes needed in viewAllEvents, createEvent, viewEvent, editEvent, deleteEvent
+// No changes needed in viewAllEvents, createEvent, viewEvent
 // No changes needed in registerForEvent, unregisterFromEvent
 
 export const viewAllEvents = catchAsyncError(async (req, res, next) => {
@@ -86,16 +86,15 @@ export const viewEvent = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ success: true, event });
 });
 
+// UPDATED: Allow all admins to edit events, not just the organizer
 export const editEvent = catchAsyncError(async (req, res, next) => {
   let event = await Event.findById(req.params.id);
   if (!event) {
     return next(new ErrorHandler("Event not found.", 404));
   }
-  if (event.organizer.toString() !== req.user._id.toString()) {
-    return next(
-      new ErrorHandler("You are not authorized to edit this event.", 403)
-    );
-  }
+  
+  // Since the route already has isAdmin middleware, we don't need to check organizer
+  // All admins can edit any event
   event = await Event.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
@@ -106,16 +105,15 @@ export const editEvent = catchAsyncError(async (req, res, next) => {
     .json({ success: true, message: "Event updated successfully.", event });
 });
 
+// UPDATED: Allow all admins to delete events, not just the organizer
 export const deleteEvent = catchAsyncError(async (req, res, next) => {
   const event = await Event.findById(req.params.id);
   if (!event) {
     return next(new ErrorHandler("Event not found.", 404));
   }
-  if (event.organizer.toString() !== req.user._id.toString()) {
-    return next(
-      new ErrorHandler("You are not authorized to delete this event.", 403)
-    );
-  }
+  
+  // Since the route already has isAdmin middleware, we don't need to check organizer
+  // All admins can delete any event
   await event.deleteOne();
   res
     .status(200)
@@ -352,6 +350,7 @@ export const unmarkAttendance = catchAsyncError(async (req, res, next) => {
     message: "Attendance unmarked successfully.",
   });
 });
+
 export const updateAttendance = catchAsyncError(async (req, res, next) => {
   const eventId = req.params.id;
   const { userId, action } = req.body;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE } from "../../config/api";
 
 const ManageEvents = () => {
   const [events, setEvents] = useState([]);
@@ -30,11 +31,20 @@ const ManageEvents = () => {
     fetchEvents();
   }, []);
 
+  // Get token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem("token");
+  };
+
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:7000/api/event/all", {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE}/api/event/all`, {
         credentials: "include",
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
       });
       const data = await response.json();
       if (response.ok) {
@@ -76,9 +86,13 @@ const ManageEvents = () => {
     if (window.confirm("Are you sure you want to delete this event?")) {
       setDeleteLoadingId(id);
       try {
-        const response = await fetch(`http://localhost:7000/api/event/${id}`, {
+        const token = getAuthToken();
+        const response = await fetch(`${API_BASE}/api/event/${id}`, {
           method: "DELETE",
           credentials: "include",
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
         });
         const data = await response.json();
         if (response.ok) {
@@ -101,14 +115,19 @@ const ManageEvents = () => {
     setError("");
 
     try {
+      const token = getAuthToken();
       const updateData = {
         ...formData,
         tags: [formData.tags],
       };
-      const response = await fetch(`http://localhost:7000/api/event/${id}`, {
+      
+      const response = await fetch(`${API_BASE}/api/event/${id}`, {
         method: "PUT",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
         body: JSON.stringify(updateData),
       });
 
@@ -118,7 +137,7 @@ const ManageEvents = () => {
         setEditingEvent(null);
         alert("Event updated successfully!");
       } else {
-        setError(data.message || "Failed to update event");
+        setError(data.message || "Failed to update event. You may not have permission to edit this event.");
       }
     } catch (err) {
       setError("Failed to connect to the server");
@@ -152,37 +171,37 @@ const ManageEvents = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-                <p className="text-gray-600">Loading events...</p>     {" "}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-                <p className="text-red-500">{error}</p>     {" "}
+        <p className="text-gray-600">Loading events...</p>
       </div>
     );
   }
 
   return (
     <div className="px-6 py-2">
-      {" "}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+          <button 
+            onClick={() => setError("")}
+            className="float-right text-red-800 font-bold"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      
       {events.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-xl">No events found.</p>{" "}
+          <p className="text-gray-500 text-xl">No events found.</p>
         </div>
       ) : (
         <>
-          {" "}
           {events.map((event) => (
             <div
               key={event._id}
               className="border border-gray-300 rounded-lg px-6 my-7 py-8 shadow-xl hover:shadow-2xl transition bg-white"
             >
-              {" "}
               <div className="flex flex-col sm:flex-row gap-4">
-                {" "}
                 <img
                   src={
                     event.image ||
@@ -190,78 +209,69 @@ const ManageEvents = () => {
                   }
                   alt="Event"
                   className="w-48 h-48 mx-3 object-cover rounded"
-                />{" "}
+                />
                 <div className="flex flex-col justify-between w-full">
-                  {" "}
                   <div>
-                    {" "}
                     <h3 className="text-2xl sm:text-3xl font-bold mb-2 text-purple-800 break-words">
                       {event.name}
-                    </h3>{" "}
+                    </h3>
                     <p className="text-gray-700 mb-2 text-xl overflow-hidden break-words">
                       {event.description}
-                    </p>{" "}
+                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4">
-                      {" "}
                       <p className="text-lg text-gray-600">
                         <span className="font-semibold">Date:</span>{" "}
                         {formatDate(event.startTime)}
-                      </p>{" "}
+                      </p>
                       <p className="text-lg text-gray-600">
                         <span className="font-semibold">Time:</span>{" "}
                         {formatTime(event.startTime)} -{" "}
                         {formatTime(event.endTime)}
-                      </p>{" "}
+                      </p>
                       <p className="text-lg text-gray-600">
                         <span className="font-semibold">Location:</span>{" "}
                         {event.venue}
-                      </p>{" "}
+                      </p>
                       <p className="text-lg text-gray-600">
                         <span className="font-semibold">Category:</span>{" "}
                         {event.tags.join(", ")}
-                      </p>{" "}
+                      </p>
                       <p className="text-lg text-gray-600">
                         <span className="font-semibold">Attendees:</span>{" "}
                         {event.attendees?.length || 0}
-                      </p>{" "}
-                    </div>{" "}
-                  </div>{" "}
+                      </p>
+                    </div>
+                  </div>
                   <div className="flex justify-end gap-2 mt-4">
-                    {" "}
                     <button
                       className="bg-purple-700 text-white px-8 py-2 font-semibold text-lg rounded hover:bg-purple-800 transition"
                       onClick={() => handleEditClick(event)}
                       disabled={saveLoading && editingEvent === event._id}
                     >
-                      {" "}
-                      {editingEvent === event._id ? "Close" : "Edit"}{" "}
-                    </button>{" "}
+                      {editingEvent === event._id ? "Close" : "Edit"}
+                    </button>
                     <button
                       className="bg-red-500 text-white px-6 py-2 text-lg font-semibold rounded hover:bg-red-700 transition disabled:opacity-60"
                       onClick={() => handleDelete(event._id)}
                       disabled={deleteLoadingId === event._id}
                     >
-                      {" "}
                       {deleteLoadingId === event._id
                         ? "Deleting…"
-                        : "Delete"} {" "}
-                    </button>{" "}
-                  </div>{" "}
-                </div>{" "}
-              </div>{" "}
+                        : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              </div>
               {editingEvent === event._id && (
                 <form
                   onSubmit={(e) => handleUpdateSubmit(e, event._id)}
                   className="bg-gray-50 border-t-2 border-purple-400 mt-6 pt-6 px-2 animate-dropdown"
                 >
-                  {" "}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    {" "}
                     <div>
-                      {" "}
                       <label className="block text-gray-700 font-semibold mb-2">
                         Event Name
-                      </label>{" "}
+                      </label>
                       <input
                         type="text"
                         name="name"
@@ -269,13 +279,12 @@ const ManageEvents = () => {
                         className="border border-gray-400 w-full px-4 py-2 rounded"
                         onChange={handleInputChange}
                         required
-                      />{" "}
-                    </div>{" "}
+                      />
+                    </div>
                     <div>
-                      {" "}
                       <label className="block text-gray-700 font-semibold mb-2">
                         Location
-                      </label>{" "}
+                      </label>
                       <select
                         name="venue"
                         value={formData.venue}
@@ -283,20 +292,18 @@ const ManageEvents = () => {
                         onChange={handleInputChange}
                         required
                       >
-                        {" "}
                         <option value="">Select a location</option>
                         {locations.map((loc) => (
                           <option key={loc} value={loc}>
                             {loc}
                           </option>
-                        ))}{" "}
-                      </select>{" "}
-                    </div>{" "}
+                        ))}
+                      </select>
+                    </div>
                     <div>
-                      {" "}
                       <label className="block text-gray-700 font-semibold mb-2">
                         Start Date & Time
-                      </label>{" "}
+                      </label>
                       <input
                         type="datetime-local"
                         name="startTime"
@@ -304,13 +311,12 @@ const ManageEvents = () => {
                         className="border border-gray-400 w-full px-4 py-2 rounded"
                         onChange={handleInputChange}
                         required
-                      />{" "}
-                    </div>{" "}
+                      />
+                    </div>
                     <div>
-                      {" "}
                       <label className="block text-gray-700 font-semibold mb-2">
                         End Date & Time
-                      </label>{" "}
+                      </label>
                       <input
                         type="datetime-local"
                         name="endTime"
@@ -318,7 +324,7 @@ const ManageEvents = () => {
                         className="border border-gray-400 w-full px-4 py-2 rounded"
                         onChange={handleInputChange}
                         required
-                      />{" "}
+                      />
                     </div>
                     <div>
                       <label className="block text-gray-700 font-semibold mb-2">
@@ -337,12 +343,11 @@ const ManageEvents = () => {
                         <option value="Networking">Networking</option>
                         <option value="Other">Other</option>
                       </select>
-                    </div>{" "}
+                    </div>
                     <div className="md:col-span-2">
-                      {" "}
                       <label className="block text-gray-700 font-semibold mb-2">
                         Description
-                      </label>{" "}
+                      </label>
                       <textarea
                         name="description"
                         value={formData.description}
@@ -350,26 +355,24 @@ const ManageEvents = () => {
                         rows="4"
                         onChange={handleInputChange}
                         required
-                      />{" "}
-                    </div>{" "}
-                  </div>{" "}
+                      />
+                    </div>
+                  </div>
                   <div className="flex justify-end">
-                    {" "}
                     <button
                       type="submit"
                       className="bg-purple-700 hover:bg-purple-800 text-white px-6 py-2 rounded font-semibold disabled:opacity-60"
                       disabled={saveLoading}
                     >
-                      {" "}
-                      {saveLoading ? "Saving…" : "Save Changes"}{" "}
-                    </button>{" "}
-                  </div>{" "}
+                      {saveLoading ? "Saving…" : "Save Changes"}
+                    </button>
+                  </div>
                 </form>
-              )}{" "}
+              )}
             </div>
-          ))}{" "}
+          ))}
         </>
-      )}{" "}
+      )}
     </div>
   );
 };

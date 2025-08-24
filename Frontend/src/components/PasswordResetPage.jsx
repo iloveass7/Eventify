@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { API_BASE } from "../config/api";
 
 const PasswordResetPage = () => {
   const { token } = useParams();
@@ -46,7 +47,7 @@ const PasswordResetPage = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:7000/api/user/password/reset/${token}`,
+        `${API_BASE}/api/user/password/reset/${token}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
