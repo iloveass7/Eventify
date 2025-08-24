@@ -16,6 +16,7 @@ config();
 const PORT = process.env.PORT || 8000;
 
 export const app = express();
+app.set('trust proxy', 1);
 
 app.use(
   cors({
