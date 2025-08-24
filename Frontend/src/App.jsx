@@ -3,6 +3,7 @@ import AuthPage from "./pages/authPage";
 import MainLayout from "./components/layouts/mainLayout";
 import InterstsSelect from "./pages/interstsSelect";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
+import UserDashboard from "./pages/User/UserDashboard";
 
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
         <Route path="/interests" element={<InterstsSelect />} />
         <Route path="/*" element={<MainLayout />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/user" element={<UserDashboard />} />
       </Routes>
     </div>
   );

@@ -186,7 +186,7 @@ const ManageEvents = () => {
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 mt-4">
+                  <div className="flex justify-end gap-2 mr-4 mt-4">
                     <button
                       className="bg-purple-700 text-white px-8 py-2 font-semibold text-lg rounded hover:bg-purple-800 transition"
                       onClick={() => handleEditClick(event)}

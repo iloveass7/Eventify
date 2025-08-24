@@ -221,31 +221,39 @@ export const generateCertificate = catchAsyncError(async (req, res, next) => {
 
   // Title
   doc
-    .fontSize(24)
+    .fontSize(28)
     .font("Helvetica-Bold")
     .fillColor("#4B0082")
-    .text("Certificate of Completion", 0, 80, { align: "center" });
+    .text("Certificate of Completion", {
+      align: "center",
+      valign: "center",
+    });
 
+  doc.moveDown(1);
+
+  // Subtitle
   doc
     .fontSize(18)
     .font("Helvetica")
     .fillColor("black")
-    .text(`This certificate acknowledges that`, { align: "center" });
+    .text(`This certificate acknowledges that`, {
+      align: "center",
+    });
 
   doc.moveDown(1);
 
   // Recipient name
   doc
-    .fontSize(28)
+    .fontSize(32)
     .font("Helvetica-Bold")
-    .fillColor("blue")
+    .fillColor("purple")
     .text(req.user.name, { align: "center" });
 
   doc.moveDown(1);
 
   // Description
   doc
-    .fontSize(16)
+    .fontSize(18)
     .font("Helvetica")
     .fillColor("black")
     .text("has successfully completed", { align: "center" });
@@ -253,21 +261,22 @@ export const generateCertificate = catchAsyncError(async (req, res, next) => {
   doc.moveDown(0.5);
 
   doc
-    .fontSize(20)
+    .fontSize(22)
     .font("Helvetica-Bold")
     .text(`${event.name} Training Program`, { align: "center" });
 
   doc.moveDown(1);
 
   doc
-    .fontSize(14)
+    .fontSize(16)
     .font("Helvetica")
+    .fillColor("black")
     .text(`Ensuring expertise in event participation and program standards.`, {
       align: "center",
       width: 700,
     });
 
-  // Dates
+  // Dates (use fixed Y to avoid exceeding border)
   const eventDate = new Date(event.time).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -277,35 +286,24 @@ export const generateCertificate = catchAsyncError(async (req, res, next) => {
   const expiryDate = new Date(event.time);
   expiryDate.setFullYear(expiryDate.getFullYear() + 3);
 
-  doc.moveDown(2);
-  doc.fontSize(12).text(`Date of Issuance: ${eventDate}`, 100, 350);
   doc
-    .fontSize(12)
-    .text(
-      `Date of Validity: ${expiryDate.toLocaleDateString("en-US")}`,
-      100,
-      370
-    );
-
-  // Signature line
-  doc.fontSize(12).text("_________________________", 100, 450);
-  doc.text("Event Organizer", 120, 470);
-
-  // CPD Badge (simple circle badge)
-  const badgeX = doc.page.width - 180;
-  const badgeY = 350;
-
-  doc.circle(badgeX, badgeY, 60).fillAndStroke("#4B0082", "black");
-  doc
-    .fillColor("white")
-    .font("Helvetica-Bold")
     .fontSize(16)
-    .text("8", badgeX - 5, badgeY - 20);
-  doc.text("CPD", badgeX - 18, badgeY);
-  doc.text("POINTS", badgeX - 30, badgeY + 20);
+    .text(`Date of Issuance: ${eventDate}`, 0, 320, { align: "center" });
+  doc
+    .fontSize(16)
+    .text(`Date of Validity: ${expiryDate.toLocaleDateString("en-US")}`, 0, 480, {
+      align: "center",
+    });
+
+  // Signature line (fixed position)
+  doc.fontSize(14).text("_________________________", 0, 400, {
+    align: "center",
+  });
+  doc.text("Event Organizer", 0, 420, { align: "center" });
 
   doc.end();
 });
+
 
 export const getPastEvents = catchAsyncError(async (req, res, next) => {
   const now = new Date();
