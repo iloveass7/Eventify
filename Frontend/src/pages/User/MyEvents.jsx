@@ -1,57 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { useTheme } from "../../components/ThemeContext";
 
 const MyEvents = () => {
+  const { isDarkMode } = useTheme();
+
   // Sample registered events data
   const [registeredEvents, setRegisteredEvents] = useState([
     {
       id: 1,
       name: "Summer Music Festival",
-      description: "Join us for a day of live music, food, and fun in the sun with top artists from around the country.",
+      description:
+        "Join us for a day of live music, food, and fun in the sun with top artists from around the country.",
       date: "July 15, 2023",
       time: "2:00 PM - 10:00 PM",
       location: "Central Park",
       price: "$45.00",
       capacity: "5000",
-      image: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
+      image:
+        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
       status: "Registered",
-      registrationDate: "2023-06-10"
+      registrationDate: "2023-06-10",
     },
     {
       id: 2,
       name: "Tech Conference 2023",
-      description: "The premier technology conference featuring keynote speakers, workshops, and networking opportunities.",
+      description:
+        "The premier technology conference featuring keynote speakers, workshops, and networking opportunities.",
       date: "August 22-24, 2023",
       time: "9:00 AM - 5:00 PM",
       location: "Convention Center",
       price: "$299.00",
       capacity: "2000",
-      image: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
+      image:
+        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
       status: "Registered",
-      registrationDate: "2023-07-15"
+      registrationDate: "2023-07-15",
     },
     {
       id: 3,
       name: "Food & Wine Festival",
-      description: "Sample culinary delights from top chefs and wineries from around the region.",
+      description:
+        "Sample culinary delights from top chefs and wineries from around the region.",
       date: "September 8-10, 2023",
       time: "12:00 PM - 8:00 PM",
       location: "Downtown Plaza",
       price: "$65.00",
       capacity: "3000",
-      image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
+      image:
+        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
       status: "Waitlisted",
-      registrationDate: "2023-08-20"
-    }
+      registrationDate: "2023-08-20",
+    },
   ]);
 
   const [unregisterLoadingId, setUnregisterLoadingId] = useState(null);
 
   const handleUnregister = (id) => {
-    if (window.confirm("Are you sure you want to unregister from this event?")) {
+    if (
+      window.confirm("Are you sure you want to unregister from this event?")
+    ) {
       setUnregisterLoadingId(id);
       // Simulate API call delay
       setTimeout(() => {
-        setRegisteredEvents(registeredEvents.filter(event => event.id !== id));
+        setRegisteredEvents(
+          registeredEvents.filter((event) => event.id !== id)
+        );
         setUnregisterLoadingId(null);
         alert("Successfully unregistered from the event!");
       }, 800);
@@ -59,7 +72,7 @@ const MyEvents = () => {
   };
 
   const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    const options = { year: "numeric", month: "long", day: "numeric" };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
@@ -67,8 +80,20 @@ const MyEvents = () => {
     <div className="px-6 py-4">
       {registeredEvents.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-xl">You haven't registered for any events yet.</p>
-          <button className="mt-4 px-6 py-2 bg-purple-700 text-white rounded hover:bg-purple-800 transition-colors">
+          <p
+            className={`text-xl transition-colors duration-500 ${
+              isDarkMode ? "text-gray-400" : "text-gray-500"
+            }`}
+          >
+            You haven't registered for any events yet.
+          </p>
+          <button
+            className={`mt-4 px-6 py-2 rounded font-medium transition-colors duration-200 ${
+              isDarkMode
+                ? "bg-purple-600 hover:bg-purple-700 text-white"
+                : "bg-purple-700 hover:bg-purple-800 text-white"
+            }`}
+          >
             Browse Events
           </button>
         </div>
@@ -77,7 +102,11 @@ const MyEvents = () => {
           {registeredEvents.map((event) => (
             <div
               key={event.id}
-              className="border border-gray-300 rounded-lg px-6 my-7 py-8 shadow-xl hover:shadow-2xl transition bg-white"
+              className={`border rounded-lg px-6 my-7 py-8 shadow-xl hover:shadow-2xl transition-all duration-300 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-600 hover:bg-gray-650"
+                  : "bg-white border-gray-300"
+              }`}
             >
               <div className="flex flex-col sm:flex-row gap-4">
                 <img
@@ -89,7 +118,9 @@ const MyEvents = () => {
                 <div className="flex flex-col justify-between w-full">
                   <div>
                     <h3
-                      className="text-2xl sm:text-3xl font-bold mb-2 text-purple-800 break-words"
+                      className={`text-2xl sm:text-3xl font-bold mb-2 break-words transition-colors duration-500 ${
+                        isDarkMode ? "text-purple-300" : "text-purple-800"
+                      }`}
                       style={{
                         wordBreak: "break-word",
                         overflowWrap: "break-word",
@@ -100,7 +131,9 @@ const MyEvents = () => {
                     </h3>
 
                     <p
-                      className="text-gray-700 mb-2 text-xl overflow-hidden break-words"
+                      className={`mb-2 text-xl overflow-hidden break-words transition-colors duration-500 ${
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      }`}
                       style={{
                         display: "-webkit-box",
                         WebkitBoxOrient: "vertical",
@@ -114,28 +147,59 @@ const MyEvents = () => {
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4">
-                      <p className="text-lg text-gray-600">
-                        <span className="font-semibold">Date:</span> {event.date}
+                      <p
+                        className={`text-lg transition-colors duration-500 ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
+                        <span className="font-semibold">Date:</span>{" "}
+                        {event.date}
                       </p>
-                      <p className="text-lg text-gray-600">
-                        <span className="font-semibold">Time:</span> {event.time}
+                      <p
+                        className={`text-lg transition-colors duration-500 ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
+                        <span className="font-semibold">Time:</span>{" "}
+                        {event.time}
                       </p>
-                      <p className="text-lg text-gray-600">
-                        <span className="font-semibold">Location:</span> {event.location}
+                      <p
+                        className={`text-lg transition-colors duration-500 ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
+                        <span className="font-semibold">Location:</span>{" "}
+                        {event.location}
                       </p>
-                      <p className="text-lg text-gray-600">
-                        <span className="font-semibold">Price:</span> {event.price}
+                      <p
+                        className={`text-lg transition-colors duration-500 ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
+                        <span className="font-semibold">Price:</span>{" "}
+                        {event.price}
                       </p>
-                      <p className="text-lg text-gray-600">
-                        <span className="font-semibold">Registered On:</span> {formatDate(event.registrationDate)}
+                      <p
+                        className={`text-lg transition-colors duration-500 ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
+                        <span className="font-semibold">Registered On:</span>{" "}
+                        {formatDate(event.registrationDate)}
                       </p>
-                      <p className="text-lg text-gray-600">
-                        <span className="font-semibold">Status:</span> 
-                        <span className={`ml-2 px-2 py-1 rounded text-sm ${
-                          event.status === 'Registered' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
+                      <p
+                        className={`text-lg transition-colors duration-500 ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
+                        <span className="font-semibold">Status:</span>
+                        <span
+                          className={`ml-2 px-2 py-1 rounded text-sm ${
+                            event.status === "Registered"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
                           {event.status}
                         </span>
                       </p>

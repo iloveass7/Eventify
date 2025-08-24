@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "../components/ThemeContext";
 
 const interestsData = [
   { id: 1, name: "Music", color: "bg-red-400", icon: "🎵" },
@@ -15,6 +16,7 @@ const interestsData = [
 const InterestsSelect = () => {
   const [selectedInterests, setSelectedInterests] = useState([]);
   const [showError, setShowError] = useState(false);
+  const { isDarkMode } = useTheme();
   const navigate = useNavigate();
 
   const toggleInterest = (id) => {
@@ -33,24 +35,56 @@ const InterestsSelect = () => {
   };
 
   return (
-    <div className="min-h-screen min-w-screen bg-gradient-to-br from-purple-50 via-white to-purple-100 text-gray-800 flex flex-col items-center justify-center p-8 relative overflow-hidden">
+    <div
+      className={`min-h-screen min-w-screen flex flex-col items-center justify-center p-8 relative overflow-hidden transition-colors duration-300 ${
+        isDarkMode
+          ? "bg-gradient-to-br from-gray-900 via-gray-800 to-purple-900 text-gray-100"
+          : "bg-gradient-to-br from-purple-50 via-white to-purple-100 text-gray-800"
+      }`}
+    >
       {/* Animated background elements */}
       <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-20 left-20 w-32 h-32 bg-purple-300 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-20 w-48 h-48 bg-purple-200 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-purple-400 rounded-full blur-3xl animate-pulse delay-500"></div>
+        <div
+          className={`absolute top-20 left-20 w-32 h-32 rounded-full blur-3xl animate-pulse transition-colors duration-300 ${
+            isDarkMode ? "bg-purple-500" : "bg-purple-300"
+          }`}
+        ></div>
+        <div
+          className={`absolute bottom-20 right-20 w-48 h-48 rounded-full blur-3xl animate-pulse delay-1000 transition-colors duration-300 ${
+            isDarkMode ? "bg-purple-400" : "bg-purple-200"
+          }`}
+        ></div>
+        <div
+          className={`absolute top-1/2 left-1/3 w-24 h-24 rounded-full blur-3xl animate-pulse delay-500 transition-colors duration-300 ${
+            isDarkMode ? "bg-purple-600" : "bg-purple-400"
+          }`}
+        ></div>
       </div>
 
       <div className="relative z-10 max-w-4xl w-full">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-thin mb-4 tracking-wider text-gray-800">
+          <h1
+            className={`text-5xl font-thin mb-4 tracking-wider transition-colors duration-300 ${
+              isDarkMode ? "text-gray-100" : "text-gray-800"
+            }`}
+          >
             curate your
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-purple-400 font-light">
+            <span
+              className={`block text-transparent bg-clip-text font-light transition-colors duration-300 ${
+                isDarkMode
+                  ? "bg-gradient-to-r from-purple-400 to-purple-300"
+                  : "bg-gradient-to-r from-purple-600 to-purple-400"
+              }`}
+            >
               interests
             </span>
           </h1>
-          <p className="text-gray-600 text-sm tracking-wide">
+          <p
+            className={`text-sm tracking-wide transition-colors duration-300 ${
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            }`}
+          >
             Select at least 3 things that spark your curiosity
           </p>
         </div>
@@ -67,10 +101,14 @@ const InterestsSelect = () => {
                   group relative cursor-pointer rounded-2xl border transition-all duration-300 ease-out
                   ${
                     isSelected
-                      ? "border-purple-400 bg-purple-50 shadow-lg shadow-purple-200/50 scale-105"
-                      : "border-gray-200 hover:border-purple-300 hover:bg-purple-50/50"
+                      ? isDarkMode
+                        ? "border-purple-400 bg-purple-900/30 shadow-lg shadow-purple-500/20 scale-105"
+                        : "border-purple-400 bg-purple-50 shadow-lg shadow-purple-200/50 scale-105"
+                      : isDarkMode
+                      ? "border-gray-600 hover:border-purple-400 hover:bg-purple-900/20 bg-gray-800/60"
+                      : "border-gray-200 hover:border-purple-300 hover:bg-purple-50/50 bg-white/60"
                   }
-                  backdrop-blur-sm bg-white/60
+                  backdrop-blur-sm
                 `}
               >
                 <div className="p-6 flex flex-col items-center text-center">
@@ -87,7 +125,11 @@ const InterestsSelect = () => {
                     text-sm font-medium tracking-wide transition-colors duration-300
                     ${
                       isSelected
-                        ? "text-purple-700"
+                        ? isDarkMode
+                          ? "text-purple-300"
+                          : "text-purple-700"
+                        : isDarkMode
+                        ? "text-gray-300 group-hover:text-purple-300"
                         : "text-gray-600 group-hover:text-purple-600"
                     }
                   `}
@@ -98,7 +140,13 @@ const InterestsSelect = () => {
 
                 {/* Selection indicator */}
                 {isSelected && (
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-purple-500 to-purple-400 rounded-full flex items-center justify-center">
+                  <div
+                    className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                      isDarkMode
+                        ? "bg-gradient-to-br from-purple-400 to-purple-300"
+                        : "bg-gradient-to-br from-purple-500 to-purple-400"
+                    }`}
+                  >
                     <svg
                       className="w-3 h-3 text-white"
                       fill="currentColor"
@@ -120,7 +168,13 @@ const InterestsSelect = () => {
         {/* Error Message */}
         {showError && (
           <div className="mb-6 text-center">
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-red-50 border border-red-200 text-red-600 text-sm animate-pulse">
+            <div
+              className={`inline-flex items-center px-4 py-2 rounded-full border text-sm animate-pulse transition-colors duration-300 ${
+                isDarkMode
+                  ? "bg-red-900/20 border-red-600 text-red-400"
+                  : "bg-red-50 border-red-200 text-red-600"
+              }`}
+            >
               <svg
                 className="w-4 h-4 mr-2"
                 fill="currentColor"
@@ -145,7 +199,11 @@ const InterestsSelect = () => {
               cursor-pointer relative px-8 py-3 rounded-full font-medium tracking-wide transition-all duration-300
               ${
                 selectedInterests.length >= 3
-                  ? "bg-gradient-to-r from-purple-500 to-purple-400 text-white hover:shadow-lg hover:shadow-purple-400/25 hover:scale-105"
+                  ? isDarkMode
+                    ? "bg-gradient-to-r from-purple-500 to-purple-400 text-white hover:shadow-lg hover:shadow-purple-500/25 hover:scale-105"
+                    : "bg-gradient-to-r from-purple-500 to-purple-400 text-white hover:shadow-lg hover:shadow-purple-400/25 hover:scale-105"
+                  : isDarkMode
+                  ? "bg-gray-700 text-gray-400 cursor-pointer hover:bg-gray-600"
                   : "bg-gray-100 text-gray-400 cursor-pointer hover:bg-gray-200"
               }
             `}
@@ -162,11 +220,19 @@ const InterestsSelect = () => {
         {/* Selected count indicator */}
         {selectedInterests.length > 0 && (
           <div className="text-center mt-6">
-            <p className="text-xs text-gray-500 tracking-wide">
+            <p
+              className={`text-xs tracking-wide transition-colors duration-300 ${
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              }`}
+            >
               {selectedInterests.length} of {interestsData.length} interests
               selected
               {selectedInterests.length < 3 && (
-                <span className="text-purple-600">
+                <span
+                  className={`transition-colors duration-300 ${
+                    isDarkMode ? "text-purple-400" : "text-purple-600"
+                  }`}
+                >
                   {" "}
                   • Need {3 - selectedInterests.length} more
                 </span>

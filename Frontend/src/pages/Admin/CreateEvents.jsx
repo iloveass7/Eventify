@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { useTheme } from "../../components/ThemeContext";
 
 const CreateEvents = () => {
   const [images, setImages] = useState([]);
@@ -8,6 +9,7 @@ const CreateEvents = () => {
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("Conference");
+  const { isDarkMode } = useTheme();
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -22,7 +24,7 @@ const CreateEvents = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     // Prepare form data (simulate API submission)
     const formData = {
       title: title.trim(),
@@ -31,12 +33,14 @@ const CreateEvents = () => {
       time,
       location,
       category,
-      images: images.slice(0, 5) // Limit to 5 images
+      images: images.slice(0, 5), // Limit to 5 images
     };
-    
+
     console.log("Event Data:", formData);
-    alert("Event created successfully! (This would connect to your backend API)");
-    
+    alert(
+      "Event created successfully! (This would connect to your backend API)"
+    );
+
     // Reset form
     setImages([]);
     setTitle("");
@@ -59,12 +63,26 @@ const CreateEvents = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4 py-8">
-      <div className="bg-white mx-2 px-10 p-8 rounded-lg shadow-lg w-full max-w-8xl">
+    <div
+      className={`flex items-center justify-center min-h-screen px-4 py-8 transition-colors duration-500 ${
+        isDarkMode ? "bg-gray-900" : "bg-gray-50"
+      }`}
+    >
+      <div
+        className={`mx-2 px-10 p-8 rounded-lg shadow-lg w-full max-w-8xl transition-colors duration-500 ${
+          isDarkMode ? "bg-gray-800" : "bg-white"
+        }`}
+      >
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Image Upload (Optional) */}
           <div>
-            <label className="block font-bold mb-2 text-lg text-gray-700">Event Image (Optional)</label>
+            <label
+              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
+                isDarkMode ? "text-gray-200" : "text-gray-700"
+              }`}
+            >
+              Event Image (Optional)
+            </label>
 
             <div className="flex items-center gap-4">
               <input
@@ -78,13 +96,23 @@ const CreateEvents = () => {
 
               <label
                 htmlFor="fileUpload"
-                className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded cursor-pointer font-medium transition-colors"
+                className={`px-4 py-2 rounded cursor-pointer font-medium transition-colors duration-300 ${
+                  isDarkMode
+                    ? "bg-purple-600 hover:bg-purple-700 text-white"
+                    : "bg-purple-700 hover:bg-purple-800 text-white"
+                }`}
               >
                 Choose Images
               </label>
 
-              <span className="text-gray-600">
-                {images.length > 0 ? `${images.length} file(s) selected` : "No file chosen"}
+              <span
+                className={`transition-colors duration-500 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}
+              >
+                {images.length > 0
+                  ? `${images.length} file(s) selected`
+                  : "No file chosen"}
               </span>
             </div>
 
@@ -114,26 +142,46 @@ const CreateEvents = () => {
 
           {/* Event Title */}
           <div>
-            <label className="block font-bold mb-2 text-lg text-gray-700">Event Title *</label>
+            <label
+              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
+                isDarkMode ? "text-gray-200" : "text-gray-700"
+              }`}
+            >
+              Event Title *
+            </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"
+                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              }`}
               placeholder="Enter event title"
             />
           </div>
 
           {/* Event Description */}
           <div>
-            <label className="block font-bold mb-2 text-lg text-gray-700">Event Description *</label>
+            <label
+              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
+                isDarkMode ? "text-gray-200" : "text-gray-700"
+              }`}
+            >
+              Event Description *
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
               rows="4"
-              className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"
+                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              }`}
               placeholder="Enter event description"
             ></textarea>
           </div>
@@ -141,49 +189,89 @@ const CreateEvents = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Event Date */}
             <div>
-              <label className="block font-bold mb-2 text-lg text-gray-700">Event Date *</label>
+              <label
+                className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
+                  isDarkMode ? "text-gray-200" : "text-gray-700"
+                }`}
+              >
+                Event Date *
+              </label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
-                className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
+                  isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-100"
+                    : "bg-white border-gray-300 text-gray-900"
+                }`}
               />
             </div>
 
             {/* Event Time */}
             <div>
-              <label className="block font-bold mb-2 text-lg text-gray-700">Event Time *</label>
+              <label
+                className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
+                  isDarkMode ? "text-gray-200" : "text-gray-700"
+                }`}
+              >
+                Event Time *
+              </label>
               <input
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 required
-                className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
+                  isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-100"
+                    : "bg-white border-gray-300 text-gray-900"
+                }`}
               />
             </div>
           </div>
 
           {/* Event Location */}
           <div>
-            <label className="block font-bold mb-2 text-lg text-gray-700">Event Location *</label>
+            <label
+              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
+                isDarkMode ? "text-gray-200" : "text-gray-700"
+              }`}
+            >
+              Event Location *
+            </label>
             <input
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               required
-              className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"
+                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              }`}
               placeholder="Enter event location"
             />
           </div>
 
           {/* Event Category */}
           <div>
-            <label className="block font-bold mb-2 text-lg text-gray-700">Event Category *</label>
+            <label
+              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
+                isDarkMode ? "text-gray-200" : "text-gray-700"
+              }`}
+            >
+              Event Category *
+            </label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
+              }`}
             >
               <option value="Conference">Conference</option>
               <option value="Workshop">Workshop</option>
@@ -202,18 +290,25 @@ const CreateEvents = () => {
             <button
               type="button"
               onClick={handleCancel}
-              className="px-6 py-3 border border-gray-300 rounded text-gray-700 font-semibold hover:bg-gray-100 transition-colors"
+              className={`px-6 py-3 border rounded font-semibold transition-colors duration-300 ${
+                isDarkMode
+                  ? "border-gray-600 text-gray-300 hover:bg-gray-700"
+                  : "border-gray-300 text-gray-700 hover:bg-gray-100"
+              }`}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-3 bg-purple-700 text-white rounded font-semibold hover:bg-purple-800 transition-colors"
+              className={`px-6 py-3 rounded font-semibold transition-colors duration-300 ${
+                isDarkMode
+                  ? "bg-purple-600 hover:bg-purple-700 text-white"
+                  : "bg-purple-700 hover:bg-purple-800 text-white"
+              }`}
             >
               Submit
             </button>
           </div>
-
         </form>
       </div>
     </div>

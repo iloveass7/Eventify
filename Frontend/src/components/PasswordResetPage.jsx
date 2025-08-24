@@ -62,7 +62,7 @@ const PasswordResetPage = () => {
       if (response.ok) {
         setMessage("Password reset successfully! Redirecting to login...");
         setTimeout(() => {
-          navigate("/auth");
+          navigate("/login");
         }, 3000);
       } else {
         setError(
