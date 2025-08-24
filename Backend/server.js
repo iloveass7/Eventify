@@ -19,7 +19,7 @@ export const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://eventify-pi-five.vercel.app/",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   })
