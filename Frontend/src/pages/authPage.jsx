@@ -1,7 +1,45 @@
 import { useState } from "react";
 
 // Mock components for demonstration
-const SignInForm = () => {
+const SignInForm = ({ onForgotPassword }) => {
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError("");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("http://localhost:7000/api/user/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+        credentials: "include", // needed for JWT cookie
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("Login success:", data);
+        window.location.href = "/home";
+        // redirect to home
+      } else {
+        setError(data.message || "Login failed");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-md space-y-6 text-center bg-white/80 backdrop-blur-lg rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/60">
       <div className="text-center">
@@ -11,43 +49,51 @@ const SignInForm = () => {
         <p className="text-gray-500 text-sm">Sign in to your account</p>
       </div>
 
-      <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <input
             type="email"
+            name="email"
             placeholder="Email address"
+            value={formData.email}
+            onChange={handleChange}
             className="w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-0 transition-all duration-300 placeholder-gray-400 text-gray-700"
           />
         </div>
         <div>
           <input
             type="password"
+            name="password"
             placeholder="Password"
+            value={formData.password}
+            onChange={handleChange}
             className="w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-0 transition-all duration-300 placeholder-gray-400 text-gray-700"
           />
         </div>
         <button
           type="submit"
+          disabled={loading}
           className="cursor-pointer w-fit px-8 py-3 rounded-full bg-gradient-to-r from-purple-500 to-purple-400 text-white font-medium tracking-wide hover:shadow-lg hover:shadow-purple-400/25 transform hover:scale-105 transition-all duration-300"
-          onClick={() => console.log("Navigate to home")}
         >
-          Sign In
+          {loading ? "Signing In..." : "Sign In"}
         </button>
-      </div>
+      </form>
+
+      {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
 
       <div className="text-center">
-        <a
-          href="#"
+        <button
+          onClick={onForgotPassword}
           className="text-sm text-purple-600 hover:text-purple-500 transition-colors"
         >
           Forgot your password?
-        </a>
+        </button>
       </div>
     </div>
   );
 };
 
-const SignUpForm = () => {
+const SignUpForm = ({ onSuccessfulRegistration }) => {
   const [selectedRole, setSelectedRole] = useState("Student");
   const [verificationMethod, setVerificationMethod] = useState("email");
   const [formData, setFormData] = useState({
@@ -141,11 +187,13 @@ const SignUpForm = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setSubmitMessage(
-          "Account created successfully! Please check your " +
-            verificationMethod +
-            " for verification."
-        );
+        // Call the callback function to open OTP modal
+        onSuccessfulRegistration({
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          verificationMethod,
+        });
+
         // Reset form
         setFormData({ name: "", email: "", phone: "", password: "" });
         setSelectedRole("student");
@@ -349,15 +397,457 @@ const SignUpForm = () => {
   );
 };
 
+// OTP Verification Modal Component
+const OTPVerificationModal = ({
+  isOpen,
+  onClose,
+  verificationData,
+  onVerificationSuccess,
+}) => {
+  const [otp, setOtp] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const handleOtpChange = (e) => {
+    setOtp(e.target.value);
+    setError("");
+    setMessage("");
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+
+    if (!otp) {
+      setError("Please enter the verification code");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch("http://localhost:7000/api/user/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: verificationData.email,
+          phone: verificationData.phone,
+          otp: otp,
+        }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage("Account verified successfully! You can now sign in.");
+        setTimeout(() => {
+          onVerificationSuccess();
+          onClose();
+        }, 2000);
+      } else {
+        setError(data.message || "Verification failed. Please try again.");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white/90 backdrop-blur-lg rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/60 w-full max-w-md">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-light tracking-wide text-gray-800 mb-2">
+            Verify Your Account
+          </h2>
+          <p className="text-gray-500 text-sm">
+            Enter the verification code sent to your{" "}
+            {verificationData.verificationMethod}
+          </p>
+        </div>
+
+        <form onSubmit={handleVerifyOtp} className="space-y-4">
+          <div>
+            <input
+              type="text"
+              placeholder="Enter verification code"
+              value={otp}
+              onChange={handleOtpChange}
+              className="w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-0 transition-all duration-300 placeholder-gray-400 text-gray-700"
+            />
+          </div>
+
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {message && <p className="text-green-500 text-sm">{message}</p>}
+
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-400 text-white font-medium hover:shadow-lg hover:shadow-purple-400/25 transition-all disabled:opacity-50"
+            >
+              {isLoading ? "Verifying..." : "Verify"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Forgot Password Modal Component
+const ForgotPasswordModal = ({ isOpen, onClose }) => {
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+    setError("");
+    setMessage("");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!email) {
+      setError("Please enter your email address");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        "http://localhost:7000/api/user/password/forgot",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage("Password reset instructions have been sent to your email.");
+        setEmail("");
+        setTimeout(() => {
+          onClose();
+        }, 3000);
+      } else {
+        setError(
+          data.message || "Failed to send reset instructions. Please try again."
+        );
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white/90 backdrop-blur-lg rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/60 w-full max-w-md">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-light tracking-wide text-gray-800 mb-2">
+            Reset Your Password
+          </h2>
+          <p className="text-gray-500 text-sm">
+            Enter your email address and we'll send you instructions to reset
+            your password.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <input
+              type="email"
+              placeholder="Email address"
+              value={email}
+              onChange={handleEmailChange}
+              className="w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-0 transition-all duration-300 placeholder-gray-400 text-gray-700"
+            />
+          </div>
+
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {message && <p className="text-green-500 text-sm">{message}</p>}
+
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-400 text-white font-medium hover:shadow-lg hover:shadow-purple-400/25 transition-all disabled:opacity-50"
+            >
+              {isLoading ? "Sending..." : "Send Instructions"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Reset Password Modal Component
+// Reset Password Modal Component
+const ResetPasswordModal = ({ isOpen, onClose, token }) => {
+  const [formData, setFormData] = useState({
+    password: "",
+    confirmPassword: "",
+    token: token || "",
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [mode, setMode] = useState(token ? "reset" : "inputToken"); // 'inputToken' or 'reset'
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError("");
+  };
+
+  const handleTokenSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.token) {
+      setError("Please enter your reset token");
+      return;
+    }
+    setMode("reset");
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!formData.password || !formData.confirmPassword) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        `http://localhost:7000/api/user/password/reset/${formData.token}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            password: formData.password,
+            confirmPassword: formData.confirmPassword,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage(
+          "Password reset successfully! You can now sign in with your new password."
+        );
+        setFormData({ password: "", confirmPassword: "", token: "" });
+        setTimeout(() => {
+          onClose();
+        }, 3000);
+      } else {
+        setError(data.message || "Failed to reset password. Please try again.");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white/90 backdrop-blur-lg rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/60 w-full max-w-md">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-light tracking-wide text-gray-800 mb-2">
+            {mode === "inputToken"
+              ? "Enter Reset Token"
+              : "Create New Password"}
+          </h2>
+          <p className="text-gray-500 text-sm">
+            {mode === "inputToken"
+              ? "Please enter the reset token you received in your email."
+              : "Enter your new password below."}
+          </p>
+        </div>
+
+        {mode === "inputToken" ? (
+          <form onSubmit={handleTokenSubmit} className="space-y-4">
+            <div>
+              <input
+                type="text"
+                name="token"
+                placeholder="Reset token"
+                value={formData.token}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-0 transition-all duration-300 placeholder-gray-400 text-gray-700"
+              />
+            </div>
+
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 px-4 py-3 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-400 text-white font-medium hover:shadow-lg hover:shadow-purple-400/25 transition-all"
+              >
+                Continue
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div>
+              <input
+                type="password"
+                name="password"
+                placeholder="New password"
+                value={formData.password}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-0 transition-all duration-300 placeholder-gray-400 text-gray-700"
+              />
+            </div>
+            <div>
+              <input
+                type="password"
+                name="confirmPassword"
+                placeholder="Confirm new password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 focus:border-purple-400 focus:outline-none focus:ring-0 transition-all duration-300 placeholder-gray-400 text-gray-700"
+              />
+            </div>
+
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+            {message && <p className="text-green-500 text-sm">{message}</p>}
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setMode("inputToken")}
+                className="flex-1 px-4 py-3 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-400 text-white font-medium hover:shadow-lg hover:shadow-purple-400/25 transition-all disabled:opacity-50"
+              >
+                {isLoading ? "Resetting..." : "Reset Password"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const AuthPage = () => {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [verificationData, setVerificationData] = useState(null);
+  const [resetToken, setResetToken] = useState("");
+
+  // Check if there's a reset token in the URL
+  useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get("token");
+    if (token) {
+      setResetToken(token);
+      setShowResetPasswordModal(true);
+    }
+  }, []);
 
   const toggleSignUpMode = () => {
     setIsSignUpMode(!isSignUpMode);
   };
 
+  const handleSuccessfulRegistration = (data) => {
+    setVerificationData(data);
+    setShowOtpModal(true);
+  };
+
+  const handleVerificationSuccess = () => {
+    // Switch to sign in mode after successful verification
+    setIsSignUpMode(false);
+  };
+
+  const handleForgotPassword = () => {
+    setShowForgotPasswordModal(true);
+  };
+
   return (
     <div className="relative w-full min-h-screen overflow-hidden bg-gradient-to-br from-purple-50 via-white to-purple-100">
+      {/* OTP Verification Modal */}
+      <OTPVerificationModal
+        isOpen={showOtpModal}
+        onClose={() => setShowOtpModal(false)}
+        verificationData={verificationData}
+        onVerificationSuccess={handleVerificationSuccess}
+      />
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPasswordModal}
+        onClose={() => setShowForgotPasswordModal(false)}
+      />
+
+      {/* Reset Password Modal */}
+      <ResetPasswordModal
+        isOpen={showResetPasswordModal}
+        onClose={() => setShowResetPasswordModal(false)}
+        token={resetToken}
+      />
+
       {/* Animated background elements */}
       <div className="absolute inset-0 opacity-20">
         <div className="absolute top-20 left-20 w-32 h-32 bg-purple-300 rounded-full blur-3xl animate-pulse"></div>
@@ -434,7 +924,7 @@ const AuthPage = () => {
               transitionDelay: "0.7s",
             }}
           >
-            <SignInForm />
+            <SignInForm onForgotPassword={handleForgotPassword} />
           </div>
 
           {/* Sign Up Form */}
@@ -447,7 +937,9 @@ const AuthPage = () => {
               transitionDelay: "0.7s",
             }}
           >
-            <SignUpForm />
+            <SignUpForm
+              onSuccessfulRegistration={handleSuccessfulRegistration}
+            />
           </div>
         </div>
       </div>

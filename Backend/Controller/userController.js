@@ -241,9 +241,30 @@ export const forgotPassword = catchAsyncError(async (req, res, next) => {
   }
   const resetToken = user.generateResetPasswordToken();
   await user.save({ validateBeforeSave: false });
-  const resetPasswordUrl = `${process.env.FRONTEND_URL}/password/reset/${resetToken}`;
 
-  const message = `Your Reset Password Token is:- \n\n ${resetPasswordUrl} \n\n If you have not requested this email then please ignore it.`;
+  const resetPasswordUrl = `${
+    process.env.FRONTEND_URL || "http://localhost:5173"
+  }/password/reset/${resetToken}`;
+
+  const message = `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+    <h2 style="color: #4f1d61; text-align: center;">Password Reset Request</h2>
+    <p style="font-size: 16px; color: #333;">Hello,</p>
+    <p style="font-size: 16px; color: #333;">You requested to reset your password. Click the button below to create a new password:</p>
+    <div style="text-align: center; margin: 20px 0;">
+      <a href="${resetPasswordUrl}" style="display: inline-block; background: linear-gradient(to right, #8B5CF6, #EC4899); color: white; padding: 12px 24px; text-decoration: none; border-radius: 24px; font-weight: bold;">Reset Password</a>
+    </div>
+    <p style="font-size: 16px; color: #333;">Or copy and paste this link in your browser:</p>
+    <p style="font-size: 14px; color: #666; background-color: #eee; padding: 10px; border-radius: 4px; overflow-wrap: break-word;">${resetPasswordUrl}</p>
+    <p style="font-size: 16px; color: #333;">If you did not request this, please ignore this email.</p>
+    <p style="font-size: 12px; color: #999; text-align: center; margin-top: 20px;">
+      This link will expire in 1 hour for security reasons.
+    </p>
+    <footer style="margin-top: 20px; text-align: center; font-size: 14px; color: #999;">
+      <p>Thank you,<br>Eventify Team</p>
+    </footer>
+  </div>
+`;
 
   try {
     sendEmail({
