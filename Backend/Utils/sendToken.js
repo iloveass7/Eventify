@@ -14,7 +14,7 @@ export const sendToken = (user, statusCode, message, res) => {
 
   res
     .status(statusCode)
-    .cookie("token", token, cookieOptions) // Use the new options
+    .cookie("token", token, options) // Use the new options
     .json({
       success: true,
       user,
