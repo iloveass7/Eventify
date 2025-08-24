@@ -9,6 +9,7 @@ import About from "../../pages/About";
 import Events from "../../pages/Events";
 import EventDetails from "../../pages/EventDetails";
 import { Routes, Route, useNavigate } from "react-router-dom";
+import PasswordResetPage from "../PasswordResetPage";
 
 export default function MainLayout() {
   return (
@@ -19,7 +20,7 @@ export default function MainLayout() {
         <Route path="/about" element={<About />} />
         <Route path="/events" element={<Events />} />
         <Route path="/events/:id" element={<EventDetails />} />
-        
+        <Route path="/password/reset/:token" element={<PasswordResetPage />} />
       </Routes>
       <Footer />
     </div>
