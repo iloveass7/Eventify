@@ -49,14 +49,12 @@ export default function Navbar() {
   const handleDashboardNavigation = () => {
     setIsOpen(false); // Close mobile menu when navigating
     
-    // Ensure navigation occurs after the mobile menu is closed
-    setTimeout(() => {
-      if (userRole === "Admin") {
-        navigate("/admin");
-      } else if (userRole === "Student") {
-        navigate("/user");
-      }
-    }, 300); // Ensure a slight delay for proper routing behavior
+    // Navigate immediately without delay
+    if (userRole === "Admin") {
+      navigate("/admin");
+    } else if (userRole === "Student") {
+      navigate("/user");
+    }
   };
 
   return (
