@@ -1,84 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useTheme } from "../../components/ThemeContext";
 
 const AllEvents = () => {
   const [showAll, setShowAll] = useState(false);
-  const { isDarkMode } = useTheme();
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample event data (replace with your actual data structure)
-  const events = [
-    {
-      id: 1,
-      name: "Summer Music Festival",
-      description:
-        "Join us for a day of live music, food, and fun in the sun with top artists from around the country.",
-      date: "July 15, 2023",
-      location: "Central Park",
-      image:
-        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    },
-    {
-      id: 2,
-      name: "Tech Conference 2023",
-      description:
-        "The premier technology conference featuring keynote speakers, workshops, and networking opportunities.",
-      date: "August 22-24, 2023",
-      location: "Convention Center",
-      image:
-        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    },
-    {
-      id: 3,
-      name: "Food & Wine Festival",
-      description:
-        "Sample culinary delights from top chefs and wineries from around the region.",
-      date: "September 8-10, 2023",
-      location: "Downtown Plaza",
-      image:
-        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    },
-    {
-      id: 4,
-      name: "Art Exhibition: Modern Masters",
-      description:
-        "A curated collection of contemporary art from emerging and established artists.",
-      date: "October 5-November 15, 2023",
-      location: "City Art Museum",
-      image:
-        "https://images.unsplash.com/photo-1563089145-599997674d42?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    },
-    {
-      id: 5,
-      name: "Marathon for Charity",
-      description:
-        "Run for a cause! Join our annual marathon to raise funds for local community programs.",
-      date: "November 12, 2023",
-      location: "City Streets",
-      image:
-        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    },
-    {
-      id: 6,
-      name: "Winter Wonderland Festival",
-      description:
-        "Celebrate the holiday season with ice skating, festive lights, and holiday markets.",
-      date: "December 10-23, 2023",
-      location: "Town Square",
-      image:
-        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-    },
-  ];
+  // Fetch all events from backend
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch("http://localhost:7000/api/event/all");
+        const data = await response.json();
+
+        if (response.ok) {
+          setEvents(data.events || []);
+        } else {
+          setError(data.message || "Failed to fetch events");
+        }
+      } catch (err) {
+        console.error("Error fetching events:", err);
+        setError("Failed to connect to the server");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
 
   // Determine which events to show
   const eventsToShow = showAll ? events : events.slice(0, 4);
   const hasMoreEvents = events.length > 4;
-
-  const handleViewClick = (event) => {
-    // Handle view action
-    console.log("Viewing event:", event.name);
-    alert(`Viewing event: ${event.name}`);
-  };
 
   const handleShowMore = () => {
     setShowAll(true);
@@ -88,85 +42,111 @@ const AllEvents = () => {
     setShowAll(false);
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p className="text-gray-600">Loading events...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="px-6 py-4">
       <div className="overflow-y-auto max-h-auto pr-2">
-        {eventsToShow.map((event) => (
-          <div
-            key={event.id}
-            className={`border rounded-lg px-6 my-4 py-6 shadow-md hover:shadow-lg transition-all duration-300 ${
-              isDarkMode
-                ? "bg-gray-700 border-gray-600 hover:bg-gray-650"
-                : "bg-white border-gray-200"
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row gap-6">
-              <img
-                src={event.image}
-                alt={event.name}
-                className="w-full sm:w-48 h-48 object-cover rounded-lg"
-              />
+        {eventsToShow.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="w-24 h-24 mx-auto mb-4 bg-gray-200 rounded-full flex items-center justify-center">
+              <svg
+                className="w-12 h-12 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                ></path>
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              No events found
+            </h3>
+            <p className="text-gray-600">
+              There are no events available at the moment.
+            </p>
+          </div>
+        ) : (
+          eventsToShow.map((event) => (
+            <div
+              key={event._id || event.id}
+              className="border border-gray-200 rounded-lg px-6 my-4 py-6 shadow-md hover:shadow-lg transition-all duration-300 bg-white"
+            >
+              <div className="flex flex-col sm:flex-row gap-6">
+                <img
+                  src={
+                    event.image ||
+                    "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
+                  }
+                  alt={event.name}
+                  className="w-full sm:w-48 h-48 object-cover rounded-lg"
+                />
 
-              <div className="flex flex-col justify-between w-full">
-                <div>
-                  <h3
-                    className={`text-xl sm:text-2xl font-bold mb-2 break-words transition-colors duration-300 ${
-                      isDarkMode ? "text-purple-400" : "text-purple-800"
-                    }`}
-                  >
-                    {event.name}
-                  </h3>
+                <div className="flex flex-col justify-between w-full">
+                  <div>
+                    <h3 className="text-xl sm:text-2xl font-bold mb-2 text-purple-800 break-words">
+                      {event.name}
+                    </h3>
 
-                  <p
-                    className={`mb-2 text-md transition-colors duration-300 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    <span className="font-semibold">Date:</span> {event.date}
-                  </p>
+                    <p className="text-gray-700 mb-2 text-md">
+                      <span className="font-semibold">Date:</span>{" "}
+                      {event.date
+                        ? new Date(event.date).toLocaleDateString()
+                        : "TBA"}
+                    </p>
 
-                  <p
-                    className={`mb-2 text-md transition-colors duration-300 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-700"
-                    }`}
-                  >
-                    <span className="font-semibold">Location:</span>{" "}
-                    {event.location}
-                  </p>
+                    <p className="text-gray-700 mb-2 text-md">
+                      <span className="font-semibold">Location:</span>{" "}
+                      {event.location || "Location TBA"}
+                    </p>
 
-                  <p
-                    className={`mb-4 text-lg overflow-hidden break-words transition-colors duration-300 ${
-                      isDarkMode ? "text-gray-400" : "text-gray-700"
-                    }`}
-                    style={{
-                      display: "-webkit-box",
-                      WebkitBoxOrient: "vertical",
-                      WebkitLineClamp: 3,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {event.description}
-                  </p>
-                </div>
+                    <p
+                      className="text-gray-700 mb-4 text-lg overflow-hidden break-words"
+                      style={{
+                        display: "-webkit-box",
+                        WebkitBoxOrient: "vertical",
+                        WebkitLineClamp: 3,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {event.description}
+                    </p>
+                  </div>
 
-                <div className="flex justify-end mt-4">
-                  <Link
-                    to={`/events/${event.id}`}
-                    className={`px-6 py-2 font-semibold text-lg rounded transition-colors duration-300 ${
-                      isDarkMode
-                        ? "bg-purple-600 hover:bg-purple-700 text-white"
-                        : "bg-purple-700 hover:bg-purple-800 text-white"
-                    }`}
-                  >
-                    View Details
-                  </Link>
+                  <div className="flex justify-end mt-4">
+                    <Link
+                      to={`/events/${event._id || event.id}`}
+                      className="bg-purple-700 text-white px-6 py-2 font-semibold text-lg rounded hover:bg-purple-800 transition"
+                    >
+                      View Details
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {hasMoreEvents && (
@@ -174,22 +154,14 @@ const AllEvents = () => {
           {!showAll ? (
             <button
               onClick={handleShowMore}
-              className={`px-8 py-3 rounded font-semibold transition-colors duration-300 ${
-                isDarkMode
-                  ? "bg-purple-600 hover:bg-purple-700 text-white"
-                  : "bg-purple-700 hover:bg-purple-800 text-white"
-              }`}
+              className="bg-purple-700 text-white px-8 py-3 rounded font-semibold hover:bg-purple-800 transition"
             >
               Show More Events ({events.length - 4} more)
             </button>
           ) : (
             <button
               onClick={handleShowLess}
-              className={`px-8 py-2 rounded font-semibold transition-colors duration-300 ${
-                isDarkMode
-                  ? "bg-gray-600 hover:bg-gray-500 text-white"
-                  : "bg-gray-600 hover:bg-gray-700 text-white"
-              }`}
+              className="bg-gray-600 text-white px-8 py-2 rounded font-semibold hover:bg-gray-700 transition"
             >
               Show Less
             </button>

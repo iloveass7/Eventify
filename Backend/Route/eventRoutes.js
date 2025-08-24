@@ -7,6 +7,10 @@ import {
   deleteEvent,
   generateCertificate,
   getPastEvents,
+  getUpcomingEvents,
+  markAttendance,
+  unmarkAttendance,
+  updateAttendance,
 } from "../Controller/eventController.js";
 import { isAuthenticated } from "../Middleware/auth.js";
 import { isAdmin } from "../Middleware/adminAuth.js";
@@ -17,6 +21,8 @@ import {
 } from "../Controller/eventController.js";
 
 const router = express.Router();
+router.route("/past").get(isAuthenticated, getPastEvents);
+router.route("/upcoming").get(getUpcomingEvents);
 router.route("/all").get(viewAllEvents);
 router.route("/:id").get(viewEvent);
 router
@@ -30,6 +36,16 @@ router
 router.route("/:id/register").post(isAuthenticated, registerForEvent);
 router.route("/:id/unregister").post(isAuthenticated, unregisterFromEvent);
 router.route("/:id/certificate").get(isAuthenticated, generateCertificate);
-router.route("/past").get(isAuthenticated, getPastEvents);
+
+router
+  .route("/:id/mark-attendance")
+  .post(isAuthenticated, isAdmin, markAttendance);
+router
+  .route("/:id/unmark-attendance")
+  .post(isAuthenticated, isAdmin, unmarkAttendance);
+
+router
+  .route("/:id/attendance")
+  .patch(isAuthenticated, isAdmin, updateAttendance);
 
 export default router;

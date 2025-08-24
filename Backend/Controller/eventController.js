@@ -14,30 +14,65 @@ export const viewAllEvents = catchAsyncError(async (req, res, next) => {
 });
 
 export const createEvent = catchAsyncError(async (req, res, next) => {
-  const { name, description, time, venue, tags, registrationDeadline } =
-    req.body;
+  // Now expecting startTime and endTime
+  const {
+    name,
+    description,
+    startTime,
+    endTime,
+    venue,
+    tags,
+    registrationDeadline,
+  } = req.body;
 
-  if (!name || !description || !time || !venue || !registrationDeadline) {
+  if (
+    !name ||
+    !description ||
+    !startTime ||
+    !endTime ||
+    !venue ||
+    !registrationDeadline
+  ) {
     return next(new ErrorHandler("Please provide all required fields.", 400));
   }
 
-  let imageUrl = null;
+  // --- Schedule Collision Check ---
+  // An overlap occurs if (NewStartTime < ExistingEndTime) AND (NewEndTime > ExistingStartTime)
+  const existingEvent = await Event.findOne({
+    venue: venue,
+    $or: [
+      { startTime: { $lt: endTime, $gte: startTime } }, // An event starts within the new event's timeslot
+      { endTime: { $gt: startTime, $lte: endTime } }, // An event ends within the new event's timeslot
+      { startTime: { $lte: startTime }, endTime: { $gte: endTime } }, // An event completely envelops the new event's timeslot
+    ],
+  });
 
+  if (existingEvent) {
+    return next(
+      new ErrorHandler(
+        `The venue "${venue}" is already booked from ${existingEvent.startTime.toLocaleTimeString()} to ${existingEvent.endTime.toLocaleTimeString()}.`,
+        409 // 409 Conflict is a good HTTP status code for this
+      )
+    );
+  }
+
+  // --- Image Upload (No changes here) ---
+  let imageUrl = null;
   if (req.file) {
     try {
       const result = await uploadToCloudinary(req.file.buffer, "event_images");
       imageUrl = result.secure_url;
     } catch (error) {
-      return next(
-        new ErrorHandler("Image upload failed. Please try again.", 500)
-      );
+      return next(new ErrorHandler("Image upload failed.", 500));
     }
   }
 
+  // --- Create Event (No changes here, just using new time fields) ---
   const eventData = {
     name,
     description,
-    time,
+    startTime,
+    endTime,
     venue,
     tags,
     registrationDeadline,
@@ -58,10 +93,9 @@ export const createEvent = catchAsyncError(async (req, res, next) => {
 });
 
 export const viewEvent = catchAsyncError(async (req, res, next) => {
-  const event = await Event.findById(req.params.id).populate(
-    "organizer",
-    "name email"
-  );
+  const event = await Event.findById(req.params.id)
+    .populate("organizer", "name email")
+    .populate("attendees", "name email");
 
   if (!event) {
     return next(new ErrorHandler("Event not found.", 404));
@@ -221,39 +255,31 @@ export const generateCertificate = catchAsyncError(async (req, res, next) => {
 
   // Title
   doc
-    .fontSize(28)
+    .fontSize(24)
     .font("Helvetica-Bold")
     .fillColor("#4B0082")
-    .text("Certificate of Completion", {
-      align: "center",
-      valign: "center",
-    });
+    .text("Certificate of Completion", 0, 80, { align: "center" });
 
-  doc.moveDown(1);
-
-  // Subtitle
   doc
     .fontSize(18)
     .font("Helvetica")
     .fillColor("black")
-    .text(`This certificate acknowledges that`, {
-      align: "center",
-    });
+    .text(`This certificate acknowledges that`, { align: "center" });
 
   doc.moveDown(1);
 
   // Recipient name
   doc
-    .fontSize(32)
+    .fontSize(28)
     .font("Helvetica-Bold")
-    .fillColor("purple")
+    .fillColor("blue")
     .text(req.user.name, { align: "center" });
 
   doc.moveDown(1);
 
   // Description
   doc
-    .fontSize(18)
+    .fontSize(16)
     .font("Helvetica")
     .fillColor("black")
     .text("has successfully completed", { align: "center" });
@@ -261,22 +287,21 @@ export const generateCertificate = catchAsyncError(async (req, res, next) => {
   doc.moveDown(0.5);
 
   doc
-    .fontSize(22)
+    .fontSize(20)
     .font("Helvetica-Bold")
     .text(`${event.name} Training Program`, { align: "center" });
 
   doc.moveDown(1);
 
   doc
-    .fontSize(16)
+    .fontSize(14)
     .font("Helvetica")
-    .fillColor("black")
     .text(`Ensuring expertise in event participation and program standards.`, {
       align: "center",
       width: 700,
     });
 
-  // Dates (use fixed Y to avoid exceeding border)
+  // Dates
   const eventDate = new Date(event.time).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -286,24 +311,35 @@ export const generateCertificate = catchAsyncError(async (req, res, next) => {
   const expiryDate = new Date(event.time);
   expiryDate.setFullYear(expiryDate.getFullYear() + 3);
 
+  doc.moveDown(2);
+  doc.fontSize(12).text(`Date of Issuance: ${eventDate}`, 100, 350);
   doc
-    .fontSize(16)
-    .text(`Date of Issuance: ${eventDate}`, 0, 320, { align: "center" });
-  doc
-    .fontSize(16)
-    .text(`Date of Validity: ${expiryDate.toLocaleDateString("en-US")}`, 0, 480, {
-      align: "center",
-    });
+    .fontSize(12)
+    .text(
+      `Date of Validity: ${expiryDate.toLocaleDateString("en-US")}`,
+      100,
+      370
+    );
 
-  // Signature line (fixed position)
-  doc.fontSize(14).text("_________________________", 0, 400, {
-    align: "center",
-  });
-  doc.text("Event Organizer", 0, 420, { align: "center" });
+  // Signature line
+  doc.fontSize(12).text("_________________________", 100, 450);
+  doc.text("Event Organizer", 120, 470);
+
+  // CPD Badge (simple circle badge)
+  const badgeX = doc.page.width - 180;
+  const badgeY = 350;
+
+  doc.circle(badgeX, badgeY, 60).fillAndStroke("#4B0082", "black");
+  doc
+    .fillColor("white")
+    .font("Helvetica-Bold")
+    .fontSize(16)
+    .text("8", badgeX - 5, badgeY - 20);
+  doc.text("CPD", badgeX - 18, badgeY);
+  doc.text("POINTS", badgeX - 30, badgeY + 20);
 
   doc.end();
 });
-
 
 export const getPastEvents = catchAsyncError(async (req, res, next) => {
   const now = new Date();
@@ -316,5 +352,124 @@ export const getPastEvents = catchAsyncError(async (req, res, next) => {
     success: true,
     count: pastEvents.length,
     events: pastEvents,
+  });
+});
+
+export const getUpcomingEvents = catchAsyncError(async (req, res, next) => {
+  const now = new Date();
+
+  const upcomingEvents = await Event.find({ time: { $gt: now } })
+    .populate("organizer", "name email")
+    .sort({ time: 1 });
+
+  res.status(200).json({
+    success: true,
+    count: upcomingEvents.length,
+    events: upcomingEvents,
+  });
+});
+
+export const markAttendance = catchAsyncError(async (req, res, next) => {
+  const eventId = req.params.id;
+  const { userId } = req.body;
+
+  const event = await Event.findById(eventId);
+
+  if (!event) {
+    return next(new ErrorHandler("Event not found.", 404));
+  }
+
+  if (!event.attendees.includes(userId)) {
+    return next(
+      new ErrorHandler("User is not registered for this event.", 400)
+    );
+  }
+
+  if (event.attendedBy.includes(userId)) {
+    return next(new ErrorHandler("User attendance is already marked.", 400));
+  }
+
+  event.attendedBy.push(userId);
+  await event.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Attendance marked successfully.",
+  });
+});
+
+export const unmarkAttendance = catchAsyncError(async (req, res, next) => {
+  const eventId = req.params.id;
+  const { userId } = req.body;
+
+  const event = await Event.findById(eventId);
+
+  if (!event) {
+    return next(new ErrorHandler("Event not found.", 404));
+  }
+
+  if (!event.attendedBy.includes(userId)) {
+    return next(new ErrorHandler("User attendance is not marked.", 400));
+  }
+
+  event.attendedBy = event.attendedBy.filter(
+    (id) => id.toString() !== userId.toString()
+  );
+  await event.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Attendance unmarked successfully.",
+  });
+});
+export const updateAttendance = catchAsyncError(async (req, res, next) => {
+  const eventId = req.params.id;
+  const { userId, action } = req.body;
+
+  const event = await Event.findById(eventId);
+
+  if (!event) {
+    return next(new ErrorHandler("Event not found.", 404));
+  }
+
+  // Check if user is in attendees list
+  const isAttendee = event.attendees.some(
+    (attendeeId) => attendeeId.toString() === userId.toString()
+  );
+
+  if (!isAttendee) {
+    return next(
+      new ErrorHandler("User is not registered for this event.", 400)
+    );
+  }
+
+  if (action === "add") {
+    // Add to attendedBy if not already there
+    if (event.attendedBy.includes(userId)) {
+      return next(new ErrorHandler("User attendance is already marked.", 400));
+    }
+    event.attendedBy.push(userId);
+  } else if (action === "remove") {
+    // Remove from attendedBy if exists
+    if (!event.attendedBy.includes(userId)) {
+      return next(new ErrorHandler("User attendance is not marked.", 400));
+    }
+    event.attendedBy = event.attendedBy.filter(
+      (id) => id.toString() !== userId.toString()
+    );
+  } else {
+    return next(
+      new ErrorHandler("Invalid action. Use 'add' or 'remove'.", 400)
+    );
+  }
+
+  await event.save();
+
+  res.status(200).json({
+    success: true,
+    message: `Attendance ${
+      action === "add" ? "marked" : "unmarked"
+    } successfully.`,
+    event,
   });
 });

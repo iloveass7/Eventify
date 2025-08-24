@@ -15,13 +15,26 @@ const eventSchema = new mongoose.Schema(
       type: String,
       default: "https://placehold.co/600x400/EFEFEF/AAAAAA&text=Event+Image",
     },
-    time: {
+    startTime: {
       type: Date,
-      required: [true, "Event time and date are required"],
+      required: [true, "Event start time is required"],
+    },
+    endTime: {
+      type: Date,
+      required: [true, "Event end time is required"],
     },
     venue: {
       type: String,
       required: [true, "Event venue is required"],
+      enum: [
+        "Auditorium",
+        "Red X",
+        "Badamtola",
+        "VC Seminar Room",
+        "Hawa Bhobon",
+        "TT Ground",
+        "Plaza",
+      ],
     },
     tags: {
       type: [String],

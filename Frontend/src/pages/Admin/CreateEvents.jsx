@@ -1,15 +1,35 @@
-import React, { useState } from "react";
-import { useTheme } from "../../components/ThemeContext";
+import React, { useState, useEffect } from "react";
 
 const CreateEvents = () => {
   const [images, setImages] = useState([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("Conference");
-  const { isDarkMode } = useTheme();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const locations = [
+    "Auditorium",
+    "Red X",
+    "Badamtola",
+    "VC Seminar Room",
+    "Hawa Bhobon",
+    "TT Ground",
+    "Plaza",
+  ];
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError("");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -22,69 +42,84 @@ const CreateEvents = () => {
     setImages(updatedImages);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
 
-    // Prepare form data (simulate API submission)
-    const formData = {
-      title: title.trim(),
-      description: description.trim(),
-      date,
-      time,
-      location,
-      category,
-      images: images.slice(0, 5), // Limit to 5 images
-    };
+    try {
+      const formData = new FormData();
+      formData.append("name", title.trim());
+      formData.append("description", description.trim());
+      formData.append("startTime", `${date}T${startTime}:00.000Z`);
+      formData.append("endTime", `${date}T${endTime}:00.000Z`);
+      formData.append("venue", location);
+      formData.append("tags", JSON.stringify([category]));
+      formData.append(
+        "registrationDeadline",
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      );
 
-    console.log("Event Data:", formData);
-    alert(
-      "Event created successfully! (This would connect to your backend API)"
-    );
+      if (images.length > 0) {
+        formData.append("image", images[0]);
+      }
 
-    // Reset form
-    setImages([]);
-    setTitle("");
-    setDescription("");
-    setDate("");
-    setTime("");
-    setLocation("");
-    setCategory("Conference");
+      const response = await fetch("http://localhost:7000/api/event/create", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert("Event created successfully!");
+        handleCancel(); // Use handleCancel to reset the form
+      } else {
+        setError(data.message || "Failed to create event");
+      }
+    } catch (err) {
+      console.error("Error creating event:", err);
+      setError("Failed to connect to the server");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
-    // Reset form
     setImages([]);
     setTitle("");
     setDescription("");
     setDate("");
-    setTime("");
+    setStartTime("");
+    setEndTime("");
     setLocation("");
     setCategory("Conference");
+    setError("");
   };
 
   return (
-    <div
-      className={`flex items-center justify-center min-h-screen px-4 py-8 transition-colors duration-500 ${
-        isDarkMode ? "bg-gray-900" : "bg-gray-50"
-      }`}
-    >
-      <div
-        className={`mx-2 px-10 p-8 rounded-lg shadow-lg w-full max-w-8xl transition-colors duration-500 ${
-          isDarkMode ? "bg-gray-800" : "bg-white"
-        }`}
-      >
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4 py-8">
+      {" "}
+      <div className="bg-white mx-2 px-10 p-8 rounded-lg shadow-lg w-full max-w-4xl">
+        {" "}
+        <h1 className="text-2xl font-bold text-center mb-6 text-purple-800">
+          Create New Event{" "}
+        </h1>{" "}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}{" "}
+          </div>
+        )}{" "}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Image Upload (Optional) */}
+          {/* Image Upload (Optional) */}{" "}
           <div>
-            <label
-              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
-                isDarkMode ? "text-gray-200" : "text-gray-700"
-              }`}
-            >
-              Event Image (Optional)
-            </label>
-
+            {" "}
+            <label className="block font-bold mb-2 text-lg text-gray-700">
+              Event Image (Optional){" "}
+            </label>{" "}
             <div className="flex items-center gap-4">
+              {" "}
               <input
                 type="file"
                 multiple
@@ -92,225 +127,184 @@ const CreateEvents = () => {
                 onChange={handleImageChange}
                 id="fileUpload"
                 className="hidden"
-              />
-
+              />{" "}
               <label
                 htmlFor="fileUpload"
-                className={`px-4 py-2 rounded cursor-pointer font-medium transition-colors duration-300 ${
-                  isDarkMode
-                    ? "bg-purple-600 hover:bg-purple-700 text-white"
-                    : "bg-purple-700 hover:bg-purple-800 text-white"
-                }`}
+                className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded cursor-pointer font-medium transition-colors"
               >
-                Choose Images
-              </label>
-
-              <span
-                className={`transition-colors duration-500 ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
-              >
+                Choose Images{" "}
+              </label>{" "}
+              <span className="text-gray-600">
+                {" "}
                 {images.length > 0
                   ? `${images.length} file(s) selected`
-                  : "No file chosen"}
-              </span>
+                  : "No file chosen"}{" "}
+              </span>{" "}
             </div>
-
-            {/* Image Previews */}
+            {/* Image Previews */}{" "}
             {images.length > 0 && (
               <div className="flex gap-3 mt-4 flex-wrap">
+                {" "}
                 {images.map((img, idx) => (
                   <div key={idx} className="relative group">
+                    {" "}
                     <img
                       src={URL.createObjectURL(img)}
                       alt="preview"
                       className="w-20 h-20 object-cover rounded shadow"
-                    />
+                    />{" "}
                     <button
                       type="button"
                       onClick={() => handleRemoveImage(idx)}
                       className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hidden group-hover:flex"
                       title="Remove"
                     >
-                      ✕
-                    </button>
+                      ✕{" "}
+                    </button>{" "}
                   </div>
-                ))}
+                ))}{" "}
               </div>
-            )}
+            )}{" "}
           </div>
-
-          {/* Event Title */}
+          {/* Event Title */}{" "}
           <div>
-            <label
-              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
-                isDarkMode ? "text-gray-200" : "text-gray-700"
-              }`}
-            >
-              Event Title *
-            </label>
+            {" "}
+            <label className="block font-bold mb-2 text-lg text-gray-700">
+              Event Title *{" "}
+            </label>{" "}
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
-                isDarkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"
-                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-              }`}
+              className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="Enter event title"
-            />
+            />{" "}
           </div>
-
-          {/* Event Description */}
+          {/* Event Description */}{" "}
           <div>
-            <label
-              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
-                isDarkMode ? "text-gray-200" : "text-gray-700"
-              }`}
-            >
-              Event Description *
-            </label>
+            {" "}
+            <label className="block font-bold mb-2 text-lg text-gray-700">
+              Event Description *{" "}
+            </label>{" "}
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
               rows="4"
-              className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
-                isDarkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"
-                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-              }`}
+              className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="Enter event description"
-            ></textarea>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Event Date */}
+            ></textarea>{" "}
+          </div>{" "}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Event Date */}{" "}
             <div>
-              <label
-                className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
-                  isDarkMode ? "text-gray-200" : "text-gray-700"
-                }`}
-              >
-                Event Date *
-              </label>
+              {" "}
+              <label className="block font-bold mb-2 text-lg text-gray-700">
+                Event Date *{" "}
+              </label>{" "}
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
-                className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
-                  isDarkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
-                }`}
-              />
+                min={new Date().toISOString().split("T")[0]}
+                className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />{" "}
             </div>
-
-            {/* Event Time */}
+            {/* Start Time */}{" "}
             <div>
-              <label
-                className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
-                  isDarkMode ? "text-gray-200" : "text-gray-700"
-                }`}
-              >
-                Event Time *
-              </label>
+              {" "}
+              <label className="block font-bold mb-2 text-lg text-gray-700">
+                Start Time *{" "}
+              </label>{" "}
               <input
                 type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
                 required
-                className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
-                  isDarkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
-                }`}
-              />
+                className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />{" "}
             </div>
+            {/* End Time */}{" "}
+            <div>
+              {" "}
+              <label className="block font-bold mb-2 text-lg text-gray-700">
+                End Time *{" "}
+              </label>{" "}
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                required
+                className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />{" "}
+            </div>{" "}
           </div>
-
-          {/* Event Location */}
+          {/* Event Location */}{" "}
           <div>
-            <label
-              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
-                isDarkMode ? "text-gray-200" : "text-gray-700"
-              }`}
-            >
-              Event Location *
-            </label>
-            <input
-              type="text"
+            {" "}
+            <label className="block font-bold mb-2 text-lg text-gray-700">
+              Event Location *{" "}
+            </label>{" "}
+            <select
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               required
-              className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
-                isDarkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"
-                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-              }`}
-              placeholder="Enter event location"
-            />
-          </div>
-
-          {/* Event Category */}
-          <div>
-            <label
-              className={`block font-bold mb-2 text-lg transition-colors duration-500 ${
-                isDarkMode ? "text-gray-200" : "text-gray-700"
-              }`}
+              className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
-              Event Category *
-            </label>
+              <option value="">Select a location</option>{" "}
+              {locations.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}{" "}
+                </option>
+              ))}{" "}
+            </select>{" "}
+          </div>
+          {/* Event Category */}{" "}
+          <div>
+            {" "}
+            <label className="block font-bold mb-2 text-lg text-gray-700">
+              Event Category *{" "}
+            </label>{" "}
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className={`border rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-500 ${
-                isDarkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                  : "bg-white border-gray-300 text-gray-900"
-              }`}
+              required
+              className="border border-gray-300 rounded px-4 py-2 text-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="Conference">Conference</option>
-              <option value="Workshop">Workshop</option>
-              <option value="Seminar">Seminar</option>
-              <option value="Networking">Networking</option>
-              <option value="Concert">Concert</option>
-              <option value="Festival">Festival</option>
-              <option value="Sports">Sports</option>
-              <option value="Exhibition">Exhibition</option>
-              <option value="Other">Other</option>
-            </select>
+              <option value="Workshop">Workshop</option>{" "}
+              <option value="Seminar">Seminar</option>{" "}
+              <option value="Networking">Networking</option>{" "}
+              <option value="Concert">Concert</option>{" "}
+              <option value="Festival">Festival</option>{" "}
+              <option value="Sports">Sports</option>{" "}
+              <option value="Exhibition">Exhibition</option>{" "}
+              <option value="Other">Other</option>{" "}
+            </select>{" "}
           </div>
-
-          {/* Buttons */}
+          {/* Buttons */}{" "}
           <div className="flex justify-end pt-4 flex gap-4">
+            {" "}
             <button
               type="button"
               onClick={handleCancel}
-              className={`px-6 py-3 border rounded font-semibold transition-colors duration-300 ${
-                isDarkMode
-                  ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-100"
-              }`}
+              disabled={loading}
+              className="px-6 py-3 border border-gray-300 rounded text-gray-700 font-semibold hover:bg-gray-100 transition-colors disabled:opacity-50"
             >
-              Cancel
-            </button>
+              Cancel{" "}
+            </button>{" "}
             <button
               type="submit"
-              className={`px-6 py-3 rounded font-semibold transition-colors duration-300 ${
-                isDarkMode
-                  ? "bg-purple-600 hover:bg-purple-700 text-white"
-                  : "bg-purple-700 hover:bg-purple-800 text-white"
-              }`}
+              disabled={loading}
+              className="px-6 py-3 bg-purple-700 text-white rounded font-semibold hover:bg-purple-800 transition-colors disabled:opacity-50"
             >
-              Submit
-            </button>
-          </div>
-        </form>
-      </div>
+              {loading ? "Creating..." : "Create Event"}{" "}
+            </button>{" "}
+          </div>{" "}
+        </form>{" "}
+      </div>{" "}
     </div>
   );
 };

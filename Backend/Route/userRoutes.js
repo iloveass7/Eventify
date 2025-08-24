@@ -10,6 +10,7 @@ import {
   editUser,
   updateProfilePicture,
   getAllUsers,
+  changePassword,
 } from "../Controller/userController.js";
 import { isAuthenticated } from "../Middleware/auth.js";
 import upload from "../Middleware/multer.js";
@@ -29,5 +30,5 @@ router
   .route("/me/update/picture")
   .put(isAuthenticated, upload.single("profileImage"), updateProfilePicture);
 router.route("/admin/users").get(isAuthenticated, isAdmin, getAllUsers);
-
+router.route("/change-password").put(isAuthenticated, changePassword);
 export default router;

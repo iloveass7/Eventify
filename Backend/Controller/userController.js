@@ -325,26 +325,110 @@ export const resetPassword = catchAsyncError(async (req, res, next) => {
 export const editUser = catchAsyncError(async (req, res, next) => {
   const { name, phone, universityId, password } = req.body;
 
+  const user = await User.findById(req.user.id);
+
+  if (!user) {
+    return next(new ErrorHandler("User not found.", 404));
+  }
+
+  // Only update fields that are actually being changed
+  if (name && name !== user.name) {
+    user.name = name;
+  }
+
+  if (phone && phone !== user.phone) {
+    user.phone = phone;
+  }
+
+  if (universityId && universityId !== user.universityId) {
+    user.universityId = universityId;
+  }
+
+  // Only update password if it's explicitly provided and different
+  if (password && password.trim() !== "") {
+    // Validate password length before setting
+    if (password.length < 8) {
+      return next(
+        new ErrorHandler("Password must have at least 8 characters.", 400)
+      );
+    }
+    if (password.length > 32) {
+      return next(
+        new ErrorHandler("Password cannot have more than 32 characters.", 400)
+      );
+    }
+    user.password = password;
+  }
+
+  await user.save();
+
+  // Return user without password field
+  const updatedUser = await User.findById(user._id);
+
+  res.status(200).json({
+    success: true,
+    message: "Profile updated successfully.",
+    user: updatedUser,
+  });
+});
+export const changePassword = catchAsyncError(async (req, res, next) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+
+  // Validate required fields
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    return next(new ErrorHandler("All password fields are required.", 400));
+  }
+
+  // Validate new password and confirm password match
+  if (newPassword !== confirmPassword) {
+    return next(new ErrorHandler("New passwords do not match.", 400));
+  }
+
+  // Validate new password length
+  if (newPassword.length < 8) {
+    return next(
+      new ErrorHandler("Password must have at least 8 characters.", 400)
+    );
+  }
+
+  if (newPassword.length > 32) {
+    return next(
+      new ErrorHandler("Password cannot have more than 32 characters.", 400)
+    );
+  }
+
+  // Get user with password field
   const user = await User.findById(req.user.id).select("+password");
 
   if (!user) {
     return next(new ErrorHandler("User not found.", 404));
   }
 
-  if (name) user.name = name;
-  if (phone) user.phone = phone;
-  if (universityId) user.universityId = universityId;
+  // Verify current password
+  const isCurrentPasswordCorrect = await user.comparePassword(currentPassword);
 
-  if (password) {
-    user.password = password;
+  if (!isCurrentPasswordCorrect) {
+    return next(new ErrorHandler("Current password is incorrect.", 400));
   }
 
+  // Check if new password is different from current password
+  const isSamePassword = await user.comparePassword(newPassword);
+  if (isSamePassword) {
+    return next(
+      new ErrorHandler(
+        "New password must be different from current password.",
+        400
+      )
+    );
+  }
+
+  // Update password
+  user.password = newPassword;
   await user.save();
 
   res.status(200).json({
     success: true,
-    message: "Profile updated successfully.",
-    user,
+    message: "Password changed successfully.",
   });
 });
 

@@ -1,121 +1,130 @@
-import React, { useState } from "react";
-import { useTheme } from "../../components/ThemeContext";
+import React, { useState, useEffect } from "react";
 
 const ManageEvents = () => {
-  const { isDarkMode } = useTheme();
-
-  // Sample event data (replace with your actual data structure)
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      name: "Summer Music Festival",
-      description:
-        "Join us for a day of live music, food, and fun in the sun with top artists from around the country.",
-      date: "July 15, 2023",
-      time: "2:00 PM - 10:00 PM",
-      location: "Central Park",
-      price: "$45.00",
-      capacity: "5000",
-      image:
-        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-      status: "Active",
-    },
-    {
-      id: 2,
-      name: "Tech Conference 2023",
-      description:
-        "The premier technology conference featuring keynote speakers, workshops, and networking opportunities.",
-      date: "August 22-24, 2023",
-      time: "9:00 AM - 5:00 PM",
-      location: "Convention Center",
-      price: "$299.00",
-      capacity: "2000",
-      image:
-        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-      status: "Active",
-    },
-    {
-      id: 3,
-      name: "Food & Wine Festival",
-      description:
-        "Sample culinary delights from top chefs and wineries from around the region.",
-      date: "September 8-10, 2023",
-      time: "12:00 PM - 8:00 PM",
-      location: "Downtown Plaza",
-      price: "$65.00",
-      capacity: "3000",
-      image:
-        "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-      status: "Upcoming",
-    },
-  ]);
-
+  const [events, setEvents] = useState([]);
   const [editingEvent, setEditingEvent] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    date: "",
-    time: "",
-    location: "",
-    price: "",
-    capacity: "",
-    status: "Active",
+    startTime: "",
+    endTime: "",
+    venue: "",
+    tags: "",
   });
-  const [showAllEvents, setShowAllEvents] = useState(false);
-
-  // Loading states
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [saveLoading, setSaveLoading] = useState(false);
   const [deleteLoadingId, setDeleteLoadingId] = useState(null);
 
+  const locations = [
+    "Auditorium",
+    "Red X",
+    "Badamtola",
+    "VC Seminar Room",
+    "Hawa Bhobon",
+    "TT Ground",
+    "Plaza",
+  ];
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const fetchEvents = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("http://localhost:7000/api/event/all", {
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setEvents(data.events || []);
+      } else {
+        setError(data.message || "Failed to fetch events");
+      }
+    } catch (err) {
+      setError("Failed to connect to the server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toLocalISOString = (date) => {
+    if (!date) return "";
+    const d = new Date(date);
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    return new Date(d - tzOffset).toISOString().slice(0, 16);
+  };
+
   const handleEditClick = (event) => {
-    if (editingEvent === event.id) {
+    if (editingEvent === event._id) {
       setEditingEvent(null);
     } else {
-      setEditingEvent(event.id);
+      setEditingEvent(event._id);
       setFormData({
         name: event.name || "",
         description: event.description || "",
-        date: event.date || "",
-        time: event.time || "",
-        location: event.location || "",
-        price: event.price || "",
-        capacity: event.capacity || "",
-        status: event.status || "Active",
+        startTime: toLocalISOString(event.startTime),
+        endTime: toLocalISOString(event.endTime),
+        venue: event.venue || "",
+        tags: event.tags?.[0] || "",
       });
     }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this event?")) {
       setDeleteLoadingId(id);
-      // Simulate API call delay
-      setTimeout(() => {
-        setEvents(events.filter((event) => event.id !== id));
+      try {
+        const response = await fetch(`http://localhost:7000/api/event/${id}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setEvents(events.filter((event) => event._id !== id));
+          alert("Event deleted successfully!");
+        } else {
+          setError(data.message || "Failed to delete event");
+        }
+      } catch (err) {
+        setError("Failed to connect to the server");
+      } finally {
         setDeleteLoadingId(null);
-        alert("Event deleted successfully!");
-      }, 800);
+      }
     }
   };
 
-  const handleUpdateSubmit = (e, id) => {
+  const handleUpdateSubmit = async (e, id) => {
     e.preventDefault();
     setSaveLoading(true);
+    setError("");
 
-    // Simulate API call delay
-    setTimeout(() => {
-      setEvents(
-        events.map((event) => {
-          if (event.id === id) {
-            return { ...event, ...formData };
-          }
-          return event;
-        })
-      );
+    try {
+      const updateData = {
+        ...formData,
+        tags: [formData.tags],
+      };
+      const response = await fetch(`http://localhost:7000/api/event/${id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
 
+      const data = await response.json();
+      if (response.ok) {
+        fetchEvents();
+        setEditingEvent(null);
+        alert("Event updated successfully!");
+      } else {
+        setError(data.message || "Failed to update event");
+      }
+    } catch (err) {
+      setError("Failed to connect to the server");
+    } finally {
       setSaveLoading(false);
-      setEditingEvent(null);
-      alert("Event updated successfully!");
-    }, 1000);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -123,377 +132,244 @@ const ManageEvents = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const visibleEvents = showAllEvents ? events : events;
+  const formatDate = (dateString) => {
+    if (!dateString) return "Date TBA";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return "Time TBA";
+    return new Date(dateString).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+                <p className="text-gray-600">Loading events...</p>     {" "}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+                <p className="text-red-500">{error}</p>     {" "}
+      </div>
+    );
+  }
 
   return (
     <div className="px-6 py-2">
+      {" "}
       {events.length === 0 ? (
         <div className="text-center py-12">
-          <p
-            className={`text-xl transition-colors duration-300 ${
-              isDarkMode ? "text-gray-400" : "text-gray-500"
-            }`}
-          >
-            No events found.
-          </p>
+          <p className="text-gray-500 text-xl">No events found.</p>{" "}
         </div>
       ) : (
         <>
-          {visibleEvents.map((event) => (
+          {" "}
+          {events.map((event) => (
             <div
-              key={event.id}
-              className={`border rounded-lg px-6 my-7 py-8 shadow-xl hover:shadow-2xl transition-all duration-300 ${
-                isDarkMode
-                  ? "bg-gray-700 border-gray-600 hover:bg-gray-650"
-                  : "bg-white border-gray-300"
-              }`}
+              key={event._id}
+              className="border border-gray-300 rounded-lg px-6 my-7 py-8 shadow-xl hover:shadow-2xl transition bg-white"
             >
+              {" "}
               <div className="flex flex-col sm:flex-row gap-4">
+                {" "}
                 <img
-                  src={event.image}
+                  src={
+                    event.image ||
+                    "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3"
+                  }
                   alt="Event"
                   className="w-48 h-48 mx-3 object-cover rounded"
-                />
-
+                />{" "}
                 <div className="flex flex-col justify-between w-full">
+                  {" "}
                   <div>
-                    <h3
-                      className={`text-2xl sm:text-3xl font-bold mb-2 break-words transition-colors duration-300 ${
-                        isDarkMode ? "text-purple-400" : "text-purple-800"
-                      }`}
-                      style={{
-                        wordBreak: "break-word",
-                        overflowWrap: "break-word",
-                        hyphens: "auto",
-                      }}
-                    >
+                    {" "}
+                    <h3 className="text-2xl sm:text-3xl font-bold mb-2 text-purple-800 break-words">
                       {event.name}
-                    </h3>
-
-                    <p
-                      className={`mb-2 text-xl overflow-hidden break-words transition-colors duration-300 ${
-                        isDarkMode ? "text-gray-300" : "text-gray-700"
-                      }`}
-                      style={{
-                        display: "-webkit-box",
-                        WebkitBoxOrient: "vertical",
-                        WebkitLineClamp: 3,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        wordBreak: "break-word",
-                      }}
-                    >
+                    </h3>{" "}
+                    <p className="text-gray-700 mb-2 text-xl overflow-hidden break-words">
                       {event.description}
-                    </p>
-
+                    </p>{" "}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4">
-                      <p
-                        className={`text-lg transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
-                      >
+                      {" "}
+                      <p className="text-lg text-gray-600">
                         <span className="font-semibold">Date:</span>{" "}
-                        {event.date}
-                      </p>
-                      <p
-                        className={`text-lg transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
-                      >
+                        {formatDate(event.startTime)}
+                      </p>{" "}
+                      <p className="text-lg text-gray-600">
                         <span className="font-semibold">Time:</span>{" "}
-                        {event.time}
-                      </p>
-                      <p
-                        className={`text-lg transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
-                      >
+                        {formatTime(event.startTime)} -{" "}
+                        {formatTime(event.endTime)}
+                      </p>{" "}
+                      <p className="text-lg text-gray-600">
                         <span className="font-semibold">Location:</span>{" "}
-                        {event.location}
-                      </p>
-                      <p
-                        className={`text-lg transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
-                      >
-                        <span className="font-semibold">Price:</span>{" "}
-                        {event.price}
-                      </p>
-                      <p
-                        className={`text-lg transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
-                      >
-                        <span className="font-semibold">Capacity:</span>{" "}
-                        {event.capacity}
-                      </p>
-                      <p
-                        className={`text-lg transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
-                      >
-                        <span className="font-semibold">Status:</span>
-                        <span
-                          className={`ml-2 px-2 py-1 rounded text-sm ${
-                            event.status === "Active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {event.status}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-
+                        {event.venue}
+                      </p>{" "}
+                      <p className="text-lg text-gray-600">
+                        <span className="font-semibold">Category:</span>{" "}
+                        {event.tags.join(", ")}
+                      </p>{" "}
+                      <p className="text-lg text-gray-600">
+                        <span className="font-semibold">Attendees:</span>{" "}
+                        {event.attendees?.length || 0}
+                      </p>{" "}
+                    </div>{" "}
+                  </div>{" "}
                   <div className="flex justify-end gap-2 mt-4">
+                    {" "}
                     <button
-                      className={`px-8 py-2 font-semibold text-lg rounded transition-colors duration-300 ${
-                        isDarkMode
-                          ? "bg-purple-600 hover:bg-purple-700 text-white"
-                          : "bg-purple-700 hover:bg-purple-800 text-white"
-                      }`}
+                      className="bg-purple-700 text-white px-8 py-2 font-semibold text-lg rounded hover:bg-purple-800 transition"
                       onClick={() => handleEditClick(event)}
-                      disabled={saveLoading && editingEvent === event.id}
+                      disabled={saveLoading && editingEvent === event._id}
                     >
-                      {editingEvent === event.id ? "Close" : "Edit"}
-                    </button>
-
+                      {" "}
+                      {editingEvent === event._id ? "Close" : "Edit"}{" "}
+                    </button>{" "}
                     <button
                       className="bg-red-500 text-white px-6 py-2 text-lg font-semibold rounded hover:bg-red-700 transition disabled:opacity-60"
-                      onClick={() => handleDelete(event.id)}
-                      disabled={deleteLoadingId === event.id}
+                      onClick={() => handleDelete(event._id)}
+                      disabled={deleteLoadingId === event._id}
                     >
-                      {deleteLoadingId === event.id ? (
-                        <span className="inline-flex items-center gap-2">
-                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Deleting…
-                        </span>
-                      ) : (
-                        "Delete"
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {editingEvent === event.id && (
+                      {" "}
+                      {deleteLoadingId === event._id
+                        ? "Deleting…"
+                        : "Delete"} {" "}
+                    </button>{" "}
+                  </div>{" "}
+                </div>{" "}
+              </div>{" "}
+              {editingEvent === event._id && (
                 <form
-                  onSubmit={(e) => handleUpdateSubmit(e, event.id)}
-                  className={`border-t-2 mt-6 pt-6 px-2 animate-dropdown transition-colors duration-300 ${
-                    isDarkMode
-                      ? "bg-gray-600 border-purple-500"
-                      : "bg-gray-50 border-purple-400"
-                  }`}
+                  onSubmit={(e) => handleUpdateSubmit(e, event._id)}
+                  className="bg-gray-50 border-t-2 border-purple-400 mt-6 pt-6 px-2 animate-dropdown"
                 >
+                  {" "}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    {" "}
                     <div>
-                      <label
-                        className={`block font-semibold mb-2 transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-200" : "text-gray-700"
-                        }`}
-                      >
+                      {" "}
+                      <label className="block text-gray-700 font-semibold mb-2">
                         Event Name
-                      </label>
+                      </label>{" "}
                       <input
                         type="text"
                         name="name"
                         value={formData.name}
-                        className={`w-full px-4 py-2 rounded transition-colors duration-300 ${
-                          isDarkMode
-                            ? "border-gray-500 bg-gray-800 text-white focus:border-purple-400 focus:ring-purple-400"
-                            : "border-gray-400 bg-white text-black focus:border-purple-500 focus:ring-purple-500"
-                        } border focus:ring-1 focus:outline-none`}
+                        className="border border-gray-400 w-full px-4 py-2 rounded"
                         onChange={handleInputChange}
                         required
-                      />
-                    </div>
-
+                      />{" "}
+                    </div>{" "}
                     <div>
-                      <label
-                        className={`block font-semibold mb-2 transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-200" : "text-gray-700"
-                        }`}
-                      >
-                        Date
-                      </label>
-                      <input
-                        type="text"
-                        name="date"
-                        value={formData.date}
-                        className={`w-full px-4 py-2 rounded transition-colors duration-300 ${
-                          isDarkMode
-                            ? "border-gray-500 bg-gray-800 text-white focus:border-purple-400 focus:ring-purple-400"
-                            : "border-gray-400 bg-white text-black focus:border-purple-500 focus:ring-purple-500"
-                        } border focus:ring-1 focus:outline-none`}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        className={`block font-semibold mb-2 transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-200" : "text-gray-700"
-                        }`}
-                      >
-                        Time
-                      </label>
-                      <input
-                        type="text"
-                        name="time"
-                        value={formData.time}
-                        className={`w-full px-4 py-2 rounded transition-colors duration-300 ${
-                          isDarkMode
-                            ? "border-gray-500 bg-gray-800 text-white focus:border-purple-400 focus:ring-purple-400"
-                            : "border-gray-400 bg-white text-black focus:border-purple-500 focus:ring-purple-500"
-                        } border focus:ring-1 focus:outline-none`}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        className={`block font-semibold mb-2 transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-200" : "text-gray-700"
-                        }`}
-                      >
+                      {" "}
+                      <label className="block text-gray-700 font-semibold mb-2">
                         Location
-                      </label>
-                      <input
-                        type="text"
-                        name="location"
-                        value={formData.location}
-                        className={`w-full px-4 py-2 rounded transition-colors duration-300 ${
-                          isDarkMode
-                            ? "border-gray-500 bg-gray-800 text-white focus:border-purple-400 focus:ring-purple-400"
-                            : "border-gray-400 bg-white text-black focus:border-purple-500 focus:ring-purple-500"
-                        } border focus:ring-1 focus:outline-none`}
+                      </label>{" "}
+                      <select
+                        name="venue"
+                        value={formData.venue}
+                        className="border border-gray-400 w-full px-4 py-2 rounded"
                         onChange={handleInputChange}
                         required
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        className={`block font-semibold mb-2 transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-200" : "text-gray-700"
-                        }`}
                       >
-                        Price
-                      </label>
+                        {" "}
+                        <option value="">Select a location</option>
+                        {locations.map((loc) => (
+                          <option key={loc} value={loc}>
+                            {loc}
+                          </option>
+                        ))}{" "}
+                      </select>{" "}
+                    </div>{" "}
+                    <div>
+                      {" "}
+                      <label className="block text-gray-700 font-semibold mb-2">
+                        Start Date & Time
+                      </label>{" "}
                       <input
-                        type="text"
-                        name="price"
-                        value={formData.price}
-                        className={`w-full px-4 py-2 rounded transition-colors duration-300 ${
-                          isDarkMode
-                            ? "border-gray-500 bg-gray-800 text-white focus:border-purple-400 focus:ring-purple-400"
-                            : "border-gray-400 bg-white text-black focus:border-purple-500 focus:ring-purple-500"
-                        } border focus:ring-1 focus:outline-none`}
+                        type="datetime-local"
+                        name="startTime"
+                        value={formData.startTime}
+                        className="border border-gray-400 w-full px-4 py-2 rounded"
                         onChange={handleInputChange}
                         required
-                      />
-                    </div>
-
+                      />{" "}
+                    </div>{" "}
                     <div>
-                      <label
-                        className={`block font-semibold mb-2 transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-200" : "text-gray-700"
-                        }`}
-                      >
-                        Capacity
-                      </label>
+                      {" "}
+                      <label className="block text-gray-700 font-semibold mb-2">
+                        End Date & Time
+                      </label>{" "}
                       <input
-                        type="text"
-                        name="capacity"
-                        value={formData.capacity}
-                        className={`w-full px-4 py-2 rounded transition-colors duration-300 ${
-                          isDarkMode
-                            ? "border-gray-500 bg-gray-800 text-white focus:border-purple-400 focus:ring-purple-400"
-                            : "border-gray-400 bg-white text-black focus:border-purple-500 focus:ring-purple-500"
-                        } border focus:ring-1 focus:outline-none`}
+                        type="datetime-local"
+                        name="endTime"
+                        value={formData.endTime}
+                        className="border border-gray-400 w-full px-4 py-2 rounded"
                         onChange={handleInputChange}
                         required
-                      />
+                      />{" "}
                     </div>
-
                     <div>
-                      <label
-                        className={`block font-semibold mb-2 transition-colors duration-300 ${
-                          isDarkMode ? "text-gray-200" : "text-gray-700"
-                        }`}
-                      >
-                        Status
+                      <label className="block text-gray-700 font-semibold mb-2">
+                        Category
                       </label>
                       <select
-                        name="status"
-                        value={formData.status}
-                        className={`w-full px-4 py-2 rounded transition-colors duration-300 ${
-                          isDarkMode
-                            ? "border-gray-500 bg-gray-800 text-white focus:border-purple-400 focus:ring-purple-400"
-                            : "border-gray-400 bg-white text-black focus:border-purple-500 focus:ring-purple-500"
-                        } border focus:ring-1 focus:outline-none`}
+                        name="tags"
+                        value={formData.tags}
+                        className="border border-gray-400 w-full px-4 py-2 rounded"
                         onChange={handleInputChange}
                         required
                       >
-                        <option value="Active">Active</option>
-                        <option value="Upcoming">Upcoming</option>
-                        <option value="Cancelled">Cancelled</option>
-                        <option value="Completed">Completed</option>
+                        <option value="Conference">Conference</option>
+                        <option value="Workshop">Workshop</option>
+                        <option value="Seminar">Seminar</option>
+                        <option value="Networking">Networking</option>
+                        <option value="Other">Other</option>
                       </select>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label
-                      className={`block font-semibold mb-2 transition-colors duration-300 ${
-                        isDarkMode ? "text-gray-200" : "text-gray-700"
-                      }`}
-                    >
-                      Description
-                    </label>
-                    <textarea
-                      name="description"
-                      value={formData.description}
-                      className={`w-full px-4 py-2 rounded transition-colors duration-300 ${
-                        isDarkMode
-                          ? "border-gray-500 bg-gray-800 text-white focus:border-purple-400 focus:ring-purple-400"
-                          : "border-gray-400 bg-white text-black focus:border-purple-500 focus:ring-purple-500"
-                      } border focus:ring-1 focus:outline-none`}
-                      rows="4"
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-
+                    </div>{" "}
+                    <div className="md:col-span-2">
+                      {" "}
+                      <label className="block text-gray-700 font-semibold mb-2">
+                        Description
+                      </label>{" "}
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        className="border border-gray-400 w-full px-4 py-2 rounded"
+                        rows="4"
+                        onChange={handleInputChange}
+                        required
+                      />{" "}
+                    </div>{" "}
+                  </div>{" "}
                   <div className="flex justify-end">
+                    {" "}
                     <button
                       type="submit"
-                      className={`px-6 py-2 rounded font-semibold disabled:opacity-60 inline-flex items-center gap-2 transition-colors duration-300 ${
-                        isDarkMode
-                          ? "bg-purple-600 hover:bg-purple-700 text-white"
-                          : "bg-purple-700 hover:bg-purple-800 text-white"
-                      }`}
+                      className="bg-purple-700 hover:bg-purple-800 text-white px-6 py-2 rounded font-semibold disabled:opacity-60"
                       disabled={saveLoading}
                     >
-                      {saveLoading ? (
-                        <>
-                          <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Saving…
-                        </>
-                      ) : (
-                        "Save Changes"
-                      )}
-                    </button>
-                  </div>
+                      {" "}
+                      {saveLoading ? "Saving…" : "Save Changes"}{" "}
+                    </button>{" "}
+                  </div>{" "}
                 </form>
-              )}
+              )}{" "}
             </div>
-          ))}
+          ))}{" "}
         </>
-      )}
+      )}{" "}
     </div>
   );
 };
