@@ -20,7 +20,7 @@ app.set('trust proxy', 1);
 
 app.use(
   cors({
-    origin: "https://eventify-pi-five.vercel.app",
+    origin: "https://eventify-va0c.onrender.com",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   })
