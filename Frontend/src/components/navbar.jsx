@@ -49,11 +49,51 @@ export default function Navbar() {
   const handleDashboardNavigation = () => {
     setIsOpen(false); // Close mobile menu when navigating
     
-    // Navigate immediately without delay
+    // Check if token exists before navigation
+    const token = localStorage.getItem("token");
+    const authUser = localStorage.getItem("auth_user");
+    
+    if (!token || !authUser) {
+      // If no valid auth data, redirect to login
+      navigate("/login");
+      return;
+    }
+    
+    // Navigate to appropriate dashboard
     if (userRole === "Admin") {
       navigate("/admin");
+      // Add a small delay then reload to ensure proper auth context
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     } else if (userRole === "Student") {
       navigate("/user");
+      // Add a small delay then reload to ensure proper auth context
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    }
+  };
+
+  // Alternative method for dashboard navigation with immediate reload
+  const handleDashboardNavigationWithReload = () => {
+    setIsOpen(false); // Close mobile menu when navigating
+    
+    // Check if token exists before navigation
+    const token = localStorage.getItem("token");
+    const authUser = localStorage.getItem("auth_user");
+    
+    if (!token || !authUser) {
+      // If no valid auth data, redirect to login
+      navigate("/login");
+      return;
+    }
+    
+    // Use window.location for navigation with automatic reload
+    if (userRole === "Admin") {
+      window.location.href = "/admin";
+    } else if (userRole === "Student") {
+      window.location.href = "/user";
     }
   };
 
@@ -117,7 +157,7 @@ export default function Navbar() {
                 {(userRole === "Admin" || userRole === "Student") && (
                   <li>
                     <span
-                      onClick={handleDashboardNavigation}
+                      onClick={handleDashboardNavigationWithReload}
                       className={`cursor-pointer transition-colors duration-200 ${
                         isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
                       }`}
@@ -231,7 +271,7 @@ export default function Navbar() {
                 
                 {(userRole === "Admin" || userRole === "Student") && (
                   <span
-                    onClick={handleDashboardNavigation}
+                    onClick={handleDashboardNavigationWithReload}
                     className={`cursor-pointer transition-colors duration-200 block mb-4 ${
                       isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
                     }`}

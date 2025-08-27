@@ -151,7 +151,7 @@ const Events = () => {
       setError(null);
       try {
         // Changed endpoint from /upcoming to /all
-        const res = await fetch(`${API_BASE}/api/event/all`);
+        const res = await fetch(`${API_BASE}/api/event/upcoming`);
         const data = await res.json();
         const list = Array.isArray(data?.events) ? data.events : [];
 

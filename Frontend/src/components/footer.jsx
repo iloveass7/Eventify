@@ -10,6 +10,7 @@ import {
 import { useTheme } from "../components/ThemeContext";
 import { useNavigate } from "react-router-dom";
 import SimpleFAQChatbot from "./chat";
+import { Link } from "react-router-dom";
 
 export default function Footer() {
   const { isDarkMode } = useTheme();
@@ -33,7 +34,8 @@ export default function Footer() {
           >
             Don't Miss a Moment on Campus!
           </h2>
-          <button
+          <Link 
+            to = '/login'
             className={`px-8 py-3 rounded-full font-semibold transform hover:scale-105 transition-all duration-200 shadow-lg ${
               isDarkMode
                 ? "bg-gray-100 text-gray-900 hover:bg-white"
@@ -41,7 +43,7 @@ export default function Footer() {
             }`}
           >
             Join Now &rarr;
-          </button>
+          </Link>
         </div>
 
         {/* --- Main Footer Content --- */}

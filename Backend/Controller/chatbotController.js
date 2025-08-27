@@ -51,7 +51,9 @@ const intentPatterns = {
     keywords: ["how do I register", "join an event", "sign up for a workshop"],
     responses: [
       {
-        text: "To register for an event, find it on the events page and click the 'Register' button on its details page.",
+        text: "To register as a user, you need to click on 'Register' button.",
+        link: "/register",
+        linkText: "Go to Register Page",
       },
     ],
   },
@@ -64,7 +66,7 @@ const intentPatterns = {
     responses: [
       {
         text: "To cancel your registration, go to the event's details page and click 'Cancel Registration'. You can also manage your events from your dashboard.",
-        link: "/dashboard",
+        link: "/user",
         linkText: "Go to Dashboard",
       },
     ],
@@ -74,6 +76,8 @@ const intentPatterns = {
     responses: [
       {
         text: "After an event you've attended is over, you can download a certificate of participation from the event's page or your dashboard.",
+        link: "/user",
+        linkText: "Go to Dashboard and Generate Certificate",
       },
     ],
   },

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Star, Calendar, Users, MapPin, Award, Clock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Hero = () => {
     // Refs for animation elements
@@ -278,9 +279,12 @@ const Hero = () => {
 
                             {/* CTA Button */}
                             <div className="flex items-center">
-                                <button className="bg-purple-600 text-white px-8 py-4 rounded-full font-semibold hover:bg-purple-800 transform hover:scale-105 transition-all duration-200 shadow-lg">
+                                <Link
+                                    to="/login"
+                                    className="bg-purple-600 text-white px-8 py-4 rounded-full font-semibold hover:bg-purple-800 transform hover:scale-105 transition-all duration-200 shadow-lg"
+                                >
                                     Join Now
-                                </button>
+                                </Link>
                             </div>
                         </div>
 

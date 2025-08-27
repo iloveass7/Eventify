@@ -20,30 +20,23 @@ const EventDetails = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch user data first
-        const userRes = await fetch(`${API_BASE}/api/user/me`, {
-          credentials: "include"
-        });
-
+        // Fetch user
+        const userRes = await fetch(`${API_BASE}/api/user/me`, { credentials: "include" });
         let userData = null;
         if (userRes.ok) {
           userData = await userRes.json();
-          if (userData.success) {
-            setCurrentUser(userData.user);
-          }
+          if (userData.success) setCurrentUser(userData.user);
         }
 
-        // Fetch event data
+        // Fetch event
         const eventRes = await fetch(`${API_BASE}/api/event/${id}`);
         const eventData = await eventRes.json();
 
         if (eventData.success) {
           setEvent(eventData.event);
-
-          // Check if user is registered - wait for both user and event data
           if (userData?.success && userData.user && eventData.event.attendees) {
             const userIsRegistered = eventData.event.attendees.some(
-              attendee => attendee._id === userData.user._id || attendee === userData.user._id
+              (a) => (typeof a === "string" ? a : a?._id) === userData.user._id
             );
             setIsRegistered(userIsRegistered);
           }
@@ -59,12 +52,32 @@ const EventDetails = () => {
     };
 
     fetchData();
-  }, [id]); // Remove currentUser from dependencies
+  }, [id]);
+
+  // Helpers
+  const safeDate = (d) => (d ? new Date(d) : null);
+  const now = new Date();
+
+  const eventEnd = safeDate(event?.endTime);
+  const eventStart = safeDate(event?.startTime);
+
+  // Consider event ended if now > endTime; if no endTime, fallback to startTime
+  const hasEnded = event ? (eventEnd ? now > eventEnd : eventStart ? now > eventStart : false) : false;
+
+  const registrationDeadline = safeDate(event?.registrationDeadline);
+  const isRegistrationClosed = (registrationDeadline && now > registrationDeadline) || hasEnded;
+
+  const isFull = !!event && event.maxAttendees && (event.attendees?.length || 0) >= event.maxAttendees;
 
   const handleRegistrationToggle = async () => {
     if (!currentUser) {
       alert("Please log in to register for events.");
       navigate("/login");
+      return;
+    }
+
+    // Hard block if ended / closed / full
+    if (hasEnded || isRegistrationClosed || (isFull && !isRegistered)) {
       return;
     }
 
@@ -81,12 +94,15 @@ const EventDetails = () => {
 
       if (response.ok) {
         setIsRegistered(!isRegistered);
-        setEvent((prevEvent) => ({
-          ...prevEvent,
-          attendees: isRegistered
-            ? prevEvent.attendees.filter((attendeeId) => attendeeId !== currentUser._id)
-            : [...prevEvent.attendees, currentUser._id],
-        }));
+        setEvent((prev) => {
+          if (!prev) return prev;
+          const prevAtt = Array.isArray(prev.attendees) ? prev.attendees : [];
+          const updated =
+            isRegistered
+              ? prevAtt.filter((a) => (typeof a === "string" ? a : a?._id) !== currentUser._id)
+              : [...prevAtt, currentUser._id];
+          return { ...prev, attendees: updated };
+        });
       } else {
         alert(data.message || "An error occurred.");
       }
@@ -98,42 +114,19 @@ const EventDetails = () => {
     }
   };
 
-  // Date and time formatting functions
-  const formatDate = (dateString) => {
-    if (!dateString) return "Date TBA";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric"
-    });
-  };
+  const formatDate = (dateString) =>
+    dateString
+      ? new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      : "Date TBA";
 
-  const formatTime = (dateString) => {
-    if (!dateString) return "Time TBA";
-    return new Date(dateString).toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true
-    });
-  };
+  const formatTime = (dateString) =>
+    dateString
+      ? new Date(dateString).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+      : "Time TBA";
 
-  // While loading the event
-  if (loading) {
-    return <div className="flex justify-center items-center min-h-screen">Loading event...</div>;
-  }
-
-  // If error fetching event
-  if (error) {
-    return <div className="flex justify-center items-center min-h-screen text-red-500">{error}</div>;
-  }
-
-  // If event not found
-  if (!event) {
-    return <div className="flex justify-center items-center min-h-screen">Event not found.</div>;
-  }
-
-  const isRegistrationClosed = new Date() > new Date(event.registrationDeadline);
-  const isFull = event.attendees.length >= event.maxAttendees;
+  if (loading) return <div className="flex justify-center items-center min-h-screen">Loading event...</div>;
+  if (error) return <div className="flex justify-center items-center min-h-screen text-red-500">{error}</div>;
+  if (!event) return <div className="flex justify-center items-center min-h-screen">Event not found.</div>;
 
   return (
     <div className={`min-h-screen transition-colors duration-500 ${isDarkMode ? "bg-gray-900 text-gray-300" : "bg-gray-50 text-gray-700"}`}>
@@ -148,6 +141,7 @@ const EventDetails = () => {
           </Link>
         </div>
       </div>
+
       <div className="max-w-8xl mx-17 px-4 sm:px-6 lg:px-8 py-8">
         <div className={`rounded-lg shadow-lg overflow-hidden mb-8 transition-colors duration-500 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
           <img
@@ -157,6 +151,7 @@ const EventDetails = () => {
           />
           <div className="p-6 md:p-8">
             <h1 className={`text-3xl md:text-4xl font-bold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{event.name}</h1>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 place-items-center">
               <div className="flex items-center gap-3">
                 <Calendar className={`w-6 h-6 flex-shrink-0 ${isDarkMode ? "text-purple-400" : "text-purple-600"}`} />
@@ -183,16 +178,27 @@ const EventDetails = () => {
                 <Users className={`w-6 h-6 flex-shrink-0 ${isDarkMode ? "text-purple-400" : "text-purple-600"}`} />
                 <div>
                   <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Registered</p>
-                  <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
-                    {event.attendees.length}
-                  </p>
+                  <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>{event.attendees.length}</p>
                 </div>
               </div>
             </div>
 
             {/* Centered CTA / Status */}
             <div className="w-full flex flex-col items-center">
-              {isRegistered ? (
+              {/* If event has ended: show completed status, no buttons */}
+              {hasEnded ? (
+                <div className="w-full max-w-2xl flex flex-col items-center gap-4">
+                  <div className={`flex items-center gap-3 p-4 rounded-lg w-full justify-center ${isDarkMode ? "bg-gray-700/60" : "bg-gray-100"}`}>
+                    <CheckCircle className="w-6 h-6 text-gray-500" />
+                    <div className="text-center">
+                      <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>This event has ended.</p>
+                      <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                        Registration and changes are no longer available.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : isRegistered ? (
                 <div className="w-full max-w-2xl flex flex-col items-center gap-4">
                   <div className={`flex items-center gap-3 p-4 rounded-lg w-full justify-center ${isDarkMode ? "bg-green-900/40" : "bg-green-50"}`}>
                     <CheckCircle className="w-6 h-6 text-green-500" />
@@ -204,14 +210,15 @@ const EventDetails = () => {
                     </div>
                   </div>
 
+                  {/* Allow unregister only if registration is still open */}
                   {!isRegistrationClosed && (
                     <button
                       onClick={handleRegistrationToggle}
                       disabled={actionLoading}
-                      className={`w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-lg transition-colors ${isDarkMode
-                          ? "bg-red-600 hover:bg-red-700 text-white disabled:bg-red-800"
-                          : "bg-red-500 hover:bg-red-600 text-white disabled:bg-red-400"
-                        } disabled:opacity-50`}
+                      className={`w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-lg transition-colors ${
+                        isDarkMode ? "bg-red-600 hover:bg-red-700 text-white disabled:bg-red-800"
+                                   : "bg-red-500 hover:bg-red-600 text-white disabled:bg-red-400"
+                      } disabled:opacity-50`}
                     >
                       {actionLoading ? "Processing..." : "Unregister from Event"}
                     </button>
@@ -224,41 +231,37 @@ const EventDetails = () => {
                       <button
                         onClick={handleRegistrationToggle}
                         disabled={actionLoading || isRegistrationClosed || isFull}
-                        className={`w-full px-8 py-3 rounded-lg font-semibold text-lg transition-colors disabled:opacity-50 ${isRegistrationClosed || isFull
-                            ? isDarkMode
-                              ? "bg-gray-700 text-gray-500"
-                              : "bg-gray-300 text-gray-500"
-                            : isDarkMode
-                              ? "bg-purple-600 hover:bg-purple-700 text-white"
-                              : "bg-purple-600 hover:bg-purple-700 text-white"
-                          }`}
+                        className={`w-full px-8 py-3 rounded-lg font-semibold text-lg transition-colors disabled:opacity-50 ${
+                          isRegistrationClosed || isFull
+                            ? isDarkMode ? "bg-gray-700 text-gray-500" : "bg-gray-300 text-gray-500"
+                            : isDarkMode ? "bg-purple-600 hover:bg-purple-700 text-white"
+                                         : "bg-purple-600 hover:bg-purple-700 text-white"
+                        }`}
                       >
                         {actionLoading
                           ? "Processing..."
                           : isRegistrationClosed
-                            ? "Registration Closed"
-                            : isFull
-                              ? "Event Full"
-                              : "Register Now"
-                        }
+                          ? "Registration Closed"
+                          : isFull
+                          ? "Event Full"
+                          : "Register Now"}
                       </button>
 
                       {(isRegistrationClosed || isFull) && (
                         <p className={`text-sm text-center ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                           {isRegistrationClosed
                             ? "The registration deadline has passed."
-                            : "This event has reached maximum capacity."
-                          }
+                            : "This event has reached maximum capacity."}
                         </p>
                       )}
                     </>
                   ) : (
                     <button
                       onClick={() => navigate("/login")}
-                      className={`w-full px-8 py-3 rounded-lg font-semibold text-lg transition-colors ${isDarkMode
-                          ? "bg-purple-600 hover:bg-purple-700 text-white"
-                          : "bg-purple-600 hover:bg-purple-700 text-white"
-                        }`}
+                      className={`w-full px-8 py-3 rounded-lg font-semibold text-lg transition-colors ${
+                        isDarkMode ? "bg-purple-600 hover:bg-purple-700 text-white"
+                                   : "bg-purple-600 hover:bg-purple-700 text-white"
+                      }`}
                     >
                       Log In to Register
                     </button>
@@ -267,37 +270,37 @@ const EventDetails = () => {
               )}
             </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <div className={`rounded-lg shadow-lg p-8 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-              <h2 className={`text-2xl font-bold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>About This Event</h2>
-              <p className="prose prose-lg max-w-none leading-relaxed">{event.description}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <div className={`rounded-lg shadow-lg p-8 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+                <h2 className={`text-2xl font-bold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>About This Event</h2>
+                <p className="prose prose-lg max-w-none leading-relaxed">{event.description}</p>
+              </div>
+            </div>
+
+            <div className="space-y-8">
+              {event.organizer && (
+                <div className={`rounded-lg shadow-lg p-6 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+                  <h3 className={`text-xl font-bold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>Organizer</h3>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDarkMode ? "bg-gray-700" : "bg-purple-100"}`}>
+                      <User className="w-6 h-6 text-purple-500" />
+                    </div>
+                    <div>
+                      <h4 className={`text-lg font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
+                        {event.organizer.name}
+                      </h4>
+                      <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                        {event.organizer.email}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="space-y-8">
-            {event.organizer && (
-              <div className={`rounded-lg shadow-lg p-6 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-                <h3 className={`text-xl font-bold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>Organizer</h3>
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDarkMode ? "bg-gray-700" : "bg-purple-100"
-                    }`}>
-                    <User className="w-6 h-6 text-purple-500" />
-                  </div>
-                  <div>
-                    <h4 className={`text-lg font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
-                      {event.organizer.name}
-                    </h4>
-                    <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                      {event.organizer.email}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
