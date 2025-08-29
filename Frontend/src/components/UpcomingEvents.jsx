@@ -134,7 +134,9 @@ const UpcomingEvents = ({ isDarkMode }) => {
         attendee?._id === currentUser._id || attendee === currentUser._id
     );
 
-  const isAdmin = currentUser?.role === "Admin";
+  // Treat PrimeAdmin like Admin
+  const isAdminish =
+    currentUser?.role === "Admin" || currentUser?.role === "PrimeAdmin";
 
   const handleRegister = async (eventId) => {
     if (!currentUser) {
@@ -142,9 +144,8 @@ const UpcomingEvents = ({ isDarkMode }) => {
       return;
     }
 
-    // Admins cannot register
-    if (isAdmin) {
-      // soft notify; you can replace with your notifier
+    // Admins/PrimeAdmins cannot register
+    if (isAdminish) {
       alert("Admins can’t register for events.");
       return;
     }
@@ -275,7 +276,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
               : "bg-gradient-to-br from-purple-50 to-white"
           }`}
         >
-          {/* Navigation Arrows (no zoom on hover) */}
+          {/* Navigation Arrows */}
           <button
             onClick={prevSlide}
             className={`absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full shadow-lg transition-colors duration-300 ${
@@ -494,9 +495,9 @@ const UpcomingEvents = ({ isDarkMode }) => {
                       </div>
                     </div>
 
-                    {/* Action (no zoom effects) */}
+                    {/* Action */}
                     <div className="flex gap-4 mt-auto pt-4">
-                      {isAdmin ? (
+                      {isAdminish ? (
                         <div
                           className={`flex-1 px-6 py-3 rounded-2xl text-center font-semibold border ${
                             isDarkMode

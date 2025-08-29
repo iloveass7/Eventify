@@ -43,59 +43,61 @@ const SignInForm = ({ onForgotPassword }) => {
     setError("");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-    try {
-      const response = await fetch(`${API_BASE}/api/user/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-        credentials: "include",
-      });
-      const data = await response.json();
+  try {
+    const response = await fetch(`${API_BASE}/api/user/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+      credentials: "include",
+    });
+    const data = await response.json();
 
-      if (!response.ok) {
-        setError(data.message || "Login failed");
-        return;
-      }
-
-      if (data?.token || data?.user) {
-        saveAuth({ token: data.token, user: data.user });
-      }
-
-      const meResp = await fetch(`${API_BASE}/api/user/me`, {
-        method: "GET",
-        credentials: "include",
-      });
-      const me = await meResp.json();
-
-      if (meResp.ok && me.user) {
-        saveAuth({ token: data?.token, user: me.user });
-
-        const first = consumeJustRegistered();
-
-        // 🚦 Role-based redirect
-        const dest =
-          me.user.role === "Admin"
-            ? "/admin"                // Admins → admin dashboard
-            : first
-              ? "/interests"            // first-time students → interests
-              : "/";                    // everyone else → home
-
-        navigate(dest);
-      } else {
-        setError(me.message || "Failed to fetch user data");
-      }
-
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      setError(data.message || "Login failed");
+      return;
     }
-  };
+
+    if (data?.token || data?.user) {
+      saveAuth({ token: data.token, user: data.user });
+    }
+
+    const meResp = await fetch(`${API_BASE}/api/user/me`, {
+      method: "GET",
+      credentials: "include",
+    });
+    const me = await meResp.json();
+
+    if (meResp.ok && me.user) {
+      // persist latest user copy
+      saveAuth({ token: data?.token, user: me.user });
+
+      const first = consumeJustRegistered();
+      const role = me.user.role;
+
+      // ✅ Role-aware redirect
+      const dest =
+        role === "Admin" || role === "PrimeAdmin"
+          ? "/admin"
+          : first
+          ? "/interests"
+          : "/";
+
+      navigate(dest, { replace: true });
+    } else {
+      setError(me.message || "Failed to fetch user data");
+    }
+  } catch {
+    setError("Network error. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div

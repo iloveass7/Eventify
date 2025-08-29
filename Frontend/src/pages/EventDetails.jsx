@@ -102,7 +102,9 @@ const EventDetails = () => {
   const isRegistrationClosed =
     (registrationDeadline && now > registrationDeadline) || hasEnded;
 
-  const isAdmin = currentUser?.role === "Admin";
+  // Treat PrimeAdmin like Admin for registration restriction
+  const isAdminish =
+    currentUser?.role === "Admin" || currentUser?.role === "PrimeAdmin";
 
   const handleRegistrationToggle = async () => {
     if (!currentUser) {
@@ -110,7 +112,8 @@ const EventDetails = () => {
       navigate("/login");
       return;
     }
-    if (isAdmin && !isRegistered) {
+    // Block only when trying to register (allow unregister if already registered)
+    if (isAdminish && !isRegistered) {
       alert("Admins can’t register for events.");
       return;
     }
@@ -208,7 +211,7 @@ const EventDetails = () => {
     >
       <DarkModeToggle />
 
-      {/* HERO (fills the top; no white band) */}
+      {/* HERO */}
       <div className="relative">
         <img
           src={
@@ -220,7 +223,7 @@ const EventDetails = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Back button over the image */}
+        {/* Back button */}
         <div className="absolute top-4 left-4">
           <Link
             to="/events"
@@ -231,7 +234,7 @@ const EventDetails = () => {
           </Link>
         </div>
 
-        {/* Title / badges / meta */}
+        {/* Title / meta */}
         <div className="absolute bottom-0 left-0 right-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -276,11 +279,10 @@ const EventDetails = () => {
 
       {/* CONTENT */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Make columns equal height */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           {/* LEFT COLUMN */}
           <div className="lg:col-span-2 flex flex-col gap-6 h-full">
-            {/* Description FIRST; grow to fill */}
+            {/* Description */}
             <div
               className={`rounded-xl p-6 md:p-8 shadow border flex-1 flex flex-col ${
                 isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
@@ -319,7 +321,7 @@ const EventDetails = () => {
               )}
             </div>
 
-            {/* CTA / Status (full-width variants) */}
+            {/* CTA / Status */}
             <div
               className={`rounded-xl p-5 shadow border ${
                 isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
@@ -340,7 +342,7 @@ const EventDetails = () => {
                 >
                   Log In to Register
                 </button>
-              ) : isAdmin && !isRegistered ? (
+              ) : isAdminish && !isRegistered ? (
                 <div className="w-full rounded-lg px-4 py-3 text-center font-semibold bg-red-600 text-white">
                   Admins can’t register for events.
                 </div>
@@ -413,7 +415,6 @@ const EventDetails = () => {
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6 h-full">
-            {/* Let this grow to match left column height */}
             <div
               className={`rounded-xl p-6 shadow border flex-1 flex flex-col ${
                 isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"

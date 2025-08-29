@@ -1,13 +1,63 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/layouts/AuthLayout";
 import OTPVerificationModal from "../components/modals/OTPVerificationModal";
 import { API_BASE } from "../config/api";
 import { useTheme } from "../components/ThemeContext";
 
+/* ---------- Admin Approval Modal (shown after OTP success when role=Admin) ---------- */
+function AdminApprovalModal({ isOpen, onClose, isDarkMode }) {
+  const navigate = useNavigate();
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div
+        className={`w-full max-w-lg rounded-2xl shadow-xl border p-6 transition-colors ${
+          isDarkMode
+            ? "bg-gray-800 border-gray-700 text-gray-100"
+            : "bg-white border-gray-200 text-gray-800"
+        }`}
+      >
+        <h3 className="text-2xl font-bold mb-2">Admin approval pending</h3>
+        <p className={`${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-4`}>
+          Your admin request is being assessed by the Prime Admin. You can{" "}
+          <b>log in as a user</b> now, or <b>wait</b> for approval.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <button
+            onClick={() => {
+              onClose?.();
+              navigate("/");
+            }}
+            className={`flex-1 px-5 py-3 rounded-xl font-semibold transition-colors ${
+              isDarkMode
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-100"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-800"
+            }`}
+          >
+            Wait
+          </button>
+
+          <button
+            onClick={() => {
+              onClose?.();
+              navigate("/login");
+            }}
+            className="flex-1 px-5 py-3 rounded-xl font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+          >
+            Login as User
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** ===== Sign Up Card ===== */
 const SignUpForm = ({ onSuccessfulRegistration }) => {
-  const { isDarkMode } = useTheme();           // <-- read from context
+  const { isDarkMode } = useTheme();
   const [selectedRole, setSelectedRole] = useState("Student");
   const [verificationMethod, setVerificationMethod] = useState("email");
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", password: "" });
@@ -66,10 +116,12 @@ const SignUpForm = ({ onSuccessfulRegistration }) => {
       const data = await response.json();
 
       if (response.ok) {
+        // include whether they requested Admin so the page knows what to do after OTP success
         onSuccessfulRegistration({
-          email: formData.email.trim(),
-          phone: formData.phone.trim(),
+          email: payload.email,
+          phone: payload.phone,
           verificationMethod,
+          requestedAdmin: selectedRole === "Admin",
         });
         setFormData({ name: "", email: "", phone: "", password: "" });
         setSelectedRole("Student");
@@ -77,7 +129,7 @@ const SignUpForm = ({ onSuccessfulRegistration }) => {
       } else {
         setSubmitMessage(data.message || "Registration failed. Please try again.");
       }
-    } catch (error) {
+    } catch {
       setSubmitMessage("Network error. Please check your connection and try again.");
     } finally {
       setIsLoading(false);
@@ -286,83 +338,99 @@ const SignUpForm = ({ onSuccessfulRegistration }) => {
 
 /** ===== Page (Register) ===== */
 export default function RegisterPage() {
-  const { isDarkMode } = useTheme();           // <-- read from context
+  const { isDarkMode } = useTheme();
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [showAdminApproval, setShowAdminApproval] = useState(false);
   const [verificationData, setVerificationData] = useState(null);
 
   const handleSuccessfulRegistration = (data) => {
-    setVerificationData(data);
-    setShowOtpModal(true);
+    setVerificationData(data);         // { email, phone, verificationMethod, requestedAdmin? }
+    setShowOtpModal(true);             // 1) Always show OTP modal first
   };
 
-  const leftPanel = {
-    leftContent: (
-      <>
-        <div className="space-y-4">
-          <h3 className="font-light text-3xl lg:text-4xl tracking-wide">Create your account</h3>
-          <p className="text-sm lg:text-base max-w-sm leading-relaxed text-white/90">
-            Join our community and discover amazing events tailored just for you.
-          </p>
-        </div>
-        <Link
-          to="/login"
-          className={`px-8 py-3 rounded-full text-white backdrop-blur-sm border transform hover:scale-105 transition-all duration-300 font-medium tracking-wide ${
-            isDarkMode
-              ? "bg-gray-800/30 border-gray-600/50 hover:bg-gray-700 hover:text-purple-300"
-              : "bg-white/20 border-white/30 hover:bg-white hover:text-purple-600"
-          }`}
-        >
-          Sign In
-        </Link>
-      </>
-    ),
-    rightContent: (
-      <>
-        <div className="space-y-4">
-          <h3 className="font-extrabold text-5xl lg:text-4xl tracking-wide">Welcome back</h3>
-          <p className="text-lg lg:text-base max-w-sm leading-relaxed text-white/90">
-            Sign in to continue your journey and explore personalized events.
-          </p>
-        </div>
-        <Link
-          to="/login"
-          className={`px-8 py-3 rounded-full text-white backdrop-blur-sm border transform hover:scale-105 transition-all duration-300 font-medium tracking-wide ${
-            isDarkMode
-              ? "bg-gray-800/30 border-gray-600/50 hover:bg-gray-700 hover:text-purple-300"
-              : "bg-white/20 border-white/30 hover:bg-white hover:text-purple-600"
-          }`}
-        >
-          Sign In
-        </Link>
-      </>
-    ),
-    rightDecor: (
-      <div className="hidden md:block w-48 lg:w-80 max-w-xs">
-        <div
-          className={`w-full h-48 backdrop-blur-sm rounded-3xl flex items-center justify-center border transition-colors duration-500 ${
-            isDarkMode ? "bg-gray-800/20 border-gray-600/30" : "bg-white/10 border-white/20"
-          }`}
-        >
-          <div className="text-6xl">👋</div>
-        </div>
-      </div>
-    ),
+  // Called by OTP modal when the user successfully verifies
+  const handleOtpSuccess = () => {
+    setShowOtpModal(false);
+    if (verificationData?.requestedAdmin) {
+      // 2) If they asked for Admin, now show the admin-approval modal
+      setShowAdminApproval(true);
+    }
   };
 
   return (
     <>
       <AuthLayout
         isSignUpMode={true}
-        leftPanel={leftPanel}
+        leftPanel={{
+          leftContent: (
+            <>
+              <div className="space-y-4">
+                <h3 className="font-light text-3xl lg:text-4xl tracking-wide">Create your account</h3>
+                <p className="text-sm lg:text-base max-w-sm leading-relaxed text-white/90">
+                  Join our community and discover amazing events tailored just for you.
+                </p>
+              </div>
+              <Link
+                to="/login"
+                className={`px-8 py-3 rounded-full text-white backdrop-blur-sm border transform hover:scale-105 transition-all duration-300 font-medium tracking-wide ${
+                  isDarkMode
+                    ? "bg-gray-800/30 border-gray-600/50 hover:bg-gray-700 hover:text-purple-300"
+                    : "bg-white/20 border-white/30 hover:bg-white hover:text-purple-600"
+                }`}
+              >
+                Sign In
+              </Link>
+            </>
+          ),
+          rightContent: (
+            <>
+              <div className="space-y-4">
+                <h3 className="font-extrabold text-5xl lg:text-4xl tracking-wide">Welcome back</h3>
+                <p className="text-lg lg:text-base max-w-sm leading-relaxed text-white/90">
+                  Sign in to continue your journey and explore personalized events.
+                </p>
+              </div>
+              <Link
+                to="/login"
+                className={`px-8 py-3 rounded-full text-white backdrop-blur-sm border transform hover:scale-105 transition-all duration-300 font-medium tracking-wide ${
+                  isDarkMode
+                    ? "bg-gray-800/30 border-gray-600/50 hover:bg-gray-700 hover:text-purple-300"
+                    : "bg-white/20 border-white/30 hover:bg-white hover:text-purple-600"
+                }`}
+              >
+                Sign In
+              </Link>
+            </>
+          ),
+          rightDecor: (
+            <div className="hidden md:block w-48 lg:w-80 max-w-xs">
+              <div
+                className={`w-full h-48 backdrop-blur-sm rounded-3xl flex items-center justify-center border transition-colors duration-500 ${
+                  isDarkMode ? "bg-gray-800/20 border-gray-600/30" : "bg-white/10 border-white/20"
+                }`}
+              >
+                <div className="text-6xl">👋</div>
+              </div>
+            </div>
+          ),
+        }}
         rightCard={<SignUpForm onSuccessfulRegistration={handleSuccessfulRegistration} />}
-        isDarkMode={isDarkMode}               // pass through for AuthLayout styling
+        isDarkMode={isDarkMode}
       />
 
+      {/* OTP modal first */}
       <OTPVerificationModal
         isOpen={showOtpModal}
         onClose={() => setShowOtpModal(false)}
         verificationData={verificationData}
-        onVerificationSuccess={() => {}}
+        onVerificationSuccess={handleOtpSuccess}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* After OTP success, if Admin was requested, show this */}
+      <AdminApprovalModal
+        isOpen={showAdminApproval}
+        onClose={() => setShowAdminApproval(false)}
         isDarkMode={isDarkMode}
       />
     </>

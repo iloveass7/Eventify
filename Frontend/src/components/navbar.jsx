@@ -12,90 +12,77 @@ export default function Navbar() {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem("auth_user");
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        setUserRole(parsedUser.role); // Set user role
-      } catch {
-        // Clear invalid data if parsing fails
-        localStorage.removeItem("auth_user");
-        localStorage.removeItem("token");
-        setUser(null);
-        setUserRole(null);
-      }
+  // helper to pull from storage safely
+  const readAuthUser = () => {
+    try {
+      const raw = localStorage.getItem("auth_user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
     }
+  };
+
+  // hydrate on mount
+  useEffect(() => {
+    const u = readAuthUser();
+    setUser(u);
+    setUserRole(u?.role || null);
+  }, []);
+
+  // keep in sync on focus / visibility / cross-tab storage changes
+  useEffect(() => {
+    const refreshFromStorage = () => {
+      const u = readAuthUser();
+      setUser(u);
+      setUserRole(u?.role || null);
+    };
+
+    const onFocus = () => refreshFromStorage();
+    const onVisibility = () => document.visibilityState === "visible" && refreshFromStorage();
+    const onStorage = (e) => {
+      if (e.key === "auth_user" || e.key === "auth_token") refreshFromStorage();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   const handleLogout = () => {
-    // Clear all auth-related data from localStorage
     localStorage.removeItem("token");
     localStorage.removeItem("auth_user");
-    localStorage.removeItem("user"); // in case you store additional user data
-    
-    // Reset state
+    localStorage.removeItem("user"); // if you store a second copy
     setUser(null);
     setUserRole(null);
-    
-    // Close mobile menu if open
     setIsOpen(false);
-    
-    // Navigate to login
     navigate("/login");
   };
 
   const handleDashboardNavigation = () => {
-    setIsOpen(false); // Close mobile menu when navigating
-    
-    // Check if token exists before navigation
+    setIsOpen(false);
     const token = localStorage.getItem("token");
     const authUser = localStorage.getItem("auth_user");
-    
     if (!token || !authUser) {
-      // If no valid auth data, redirect to login
       navigate("/login");
       return;
     }
-    
-    // Navigate to appropriate dashboard
-    if (userRole === "Admin") {
+    if (userRole === "Admin" || userRole === "PrimeAdmin") {
       navigate("/admin");
-      // Add a small delay then reload to ensure proper auth context
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
     } else if (userRole === "Student") {
       navigate("/user");
-      // Add a small delay then reload to ensure proper auth context
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
+    } else {
+      navigate("/login");
     }
   };
 
-  // Alternative method for dashboard navigation with immediate reload
-  const handleDashboardNavigationWithReload = () => {
-    setIsOpen(false); // Close mobile menu when navigating
-    
-    // Check if token exists before navigation
-    const token = localStorage.getItem("token");
-    const authUser = localStorage.getItem("auth_user");
-    
-    if (!token || !authUser) {
-      // If no valid auth data, redirect to login
-      navigate("/login");
-      return;
-    }
-    
-    // Use window.location for navigation with automatic reload
-    if (userRole === "Admin") {
-      window.location.href = "/admin";
-    } else if (userRole === "Student") {
-      window.location.href = "/user";
-    }
-  };
+  const isLoggedIn = !!user;
+  const isAdminish = userRole === "Admin" || userRole === "PrimeAdmin";
+  const isStudent = userRole === "Student";
 
   return (
     <nav
@@ -105,10 +92,7 @@ export default function Navbar() {
     >
       <div className="max-w-8xl mx-auto px-6 md:px-24 lg:px-25 py-6 flex items-center">
         {/* Logo */}
-        <div
-          onClick={() => navigate("/")}
-          className="flex-1 flex justify-start cursor-pointer"
-        >
+        <div onClick={() => navigate("/")} className="flex-1 flex justify-start cursor-pointer">
           <h1
             className={`text-[3.1rem] font-extrabold transition-colors duration-300 ${
               isDarkMode ? "text-gray-100" : "text-white"
@@ -121,29 +105,17 @@ export default function Navbar() {
         {/* Desktop Navigation Links */}
         <ul className="hidden md:flex flex-1 justify-center gap-10 text-lg font-semibold lg:text-[1.4rem]">
           <li onClick={() => navigate("/about")}>
-            <span
-              className={`cursor-pointer transition-colors duration-200 ${
-                isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-              }`}
-            >
+            <span className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200`}>
               About
             </span>
           </li>
           <li onClick={() => navigate("/")}>
-            <span
-              className={`cursor-pointer transition-colors duration-200 ${
-                isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-              }`}
-            >
+            <span className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200`}>
               Home
             </span>
           </li>
           <li onClick={() => navigate("/events")}>
-            <span
-              className={`cursor-pointer transition-colors duration-200 ${
-                isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-              }`}
-            >
+            <span className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200`}>
               Events
             </span>
           </li>
@@ -152,28 +124,22 @@ export default function Navbar() {
         {/* Right-side Actions */}
         <div className="flex-1 flex justify-end items-center gap-6 md:gap-6 lg:gap-10">
           <ul className="hidden md:flex space-x-6 text-lg font-semibold lg:text-[1.4rem]">
-            {user ? (
+            {isLoggedIn ? (
               <>
-                {(userRole === "Admin" || userRole === "Student") && (
+                {(isAdminish || isStudent) && (
                   <li>
                     <span
-                      onClick={handleDashboardNavigationWithReload}
-                      className={`cursor-pointer transition-colors duration-200 ${
-                        isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                      }`}
+                      onClick={handleDashboardNavigation}
+                      className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200`}
                     >
-                      {userRole === "Admin" ? "Admin Dashboard" : "User Dashboard"}
+                      {isAdminish ? "Admin Dashboard" : "User Dashboard"}
                     </span>
                   </li>
                 )}
                 <li>
                   <button
                     onClick={handleLogout}
-                    className={`transition-colors duration-200 ${
-                      isDarkMode
-                        ? "hover:text-purple-300"
-                        : "hover:text-purple-300"
-                    }`}
+                    className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} transition-colors duration-200`}
                   >
                     Logout
                   </button>
@@ -182,20 +148,12 @@ export default function Navbar() {
             ) : (
               <>
                 <li onClick={() => navigate("/login")}>
-                  <span
-                    className={`cursor-pointer transition-colors duration-200 ${
-                      isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                    }`}
-                  >
+                  <span className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200`}>
                     Login
                   </span>
                 </li>
                 <li onClick={() => navigate("/register")}>
-                  <span
-                    className={`cursor-pointer transition-colors duration-200 ${
-                      isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                    }`}
-                  >
+                  <span className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200`}>
                     Sign Up
                   </span>
                 </li>
@@ -212,11 +170,7 @@ export default function Navbar() {
 
       {/* Mobile Menu */}
       {isOpen && (
-        <div
-          className={`md:hidden px-6 pt-8 pb-10 transition-colors duration-300 ${
-            isDarkMode ? "bg-gray-900" : "bg-purple-900"
-          }`}
-        >
+        <div className={`md:hidden px-6 pt-8 pb-10 transition-colors duration-300 ${isDarkMode ? "bg-gray-900" : "bg-purple-900"}`}>
           <ul className="flex flex-col gap-6 text-2xl font-semibold">
             <li>
               <span
@@ -224,9 +178,7 @@ export default function Navbar() {
                   setIsOpen(false);
                   navigate("/about");
                 }}
-                className={`cursor-pointer transition-colors duration-200 ${
-                  isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                }`}
+                className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200`}
               >
                 About
               </span>
@@ -237,9 +189,7 @@ export default function Navbar() {
                   setIsOpen(false);
                   navigate("/");
                 }}
-                className={`cursor-pointer transition-colors duration-200 ${
-                  isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                }`}
+                className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200`}
               >
                 Home
               </span>
@@ -250,41 +200,29 @@ export default function Navbar() {
                   setIsOpen(false);
                   navigate("/events");
                 }}
-                className={`cursor-pointer transition-colors duration-200 ${
-                  isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                }`}
+                className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200`}
               >
                 Events
               </span>
             </li>
 
             {/* Mobile User Actions */}
-            {user && (
-              <li
-                className={`pt-4 border-t transition-colors duration-300 ${
-                  isDarkMode ? "border-gray-700" : "border-purple-700"
-                }`}
-              >
-                <span className="cursor-default block mb-4">
-                  Hi, {user.name || "User"}
-                </span>
-                
-                {(userRole === "Admin" || userRole === "Student") && (
+            {isLoggedIn && (
+              <li className={`pt-4 ${isDarkMode ? "border-gray-700" : "border-purple-700"} border-t transition-colors duration-300`}>
+                <span className="cursor-default block mb-4">Hi, {user?.name || "User"}</span>
+
+                {(isAdminish || isStudent) && (
                   <span
-                    onClick={handleDashboardNavigationWithReload}
-                    className={`cursor-pointer transition-colors duration-200 block mb-4 ${
-                      isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                    }`}
+                    onClick={handleDashboardNavigation}
+                    className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200 block mb-4`}
                   >
-                    {userRole === "Admin" ? "Admin Dashboard" : "Dashboard"}
+                    {isAdminish ? "Admin Dashboard" : "Dashboard"}
                   </span>
                 )}
-                
+
                 <span
                   onClick={handleLogout}
-                  className={`cursor-pointer transition-colors duration-200 block ${
-                    isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                  }`}
+                  className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200 block`}
                 >
                   Logout
                 </span>
@@ -292,20 +230,14 @@ export default function Navbar() {
             )}
 
             {/* Mobile Auth Links for non-logged in users */}
-            {!user && (
-              <li
-                className={`pt-4 border-t transition-colors duration-300 ${
-                  isDarkMode ? "border-gray-700" : "border-purple-700"
-                }`}
-              >
+            {!isLoggedIn && (
+              <li className={`pt-4 ${isDarkMode ? "border-gray-700" : "border-purple-700"} border-t transition-colors duration-300`}>
                 <span
                   onClick={() => {
                     setIsOpen(false);
                     navigate("/login");
                   }}
-                  className={`cursor-pointer transition-colors duration-200 block mb-4 ${
-                    isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                  }`}
+                  className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200 block mb-4`}
                 >
                   Login
                 </span>
@@ -314,9 +246,7 @@ export default function Navbar() {
                     setIsOpen(false);
                     navigate("/register");
                   }}
-                  className={`cursor-pointer transition-colors duration-200 block ${
-                    isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"
-                  }`}
+                  className={`${isDarkMode ? "hover:text-purple-300" : "hover:text-purple-300"} cursor-pointer transition-colors duration-200 block`}
                 >
                   Sign Up
                 </span>

@@ -7,6 +7,8 @@ import { sendToken } from "../Utils/sendToken.js";
 import crypto from "crypto";
 import { uploadToCloudinary } from "../Utils/cloudinary.js";
 import Event from "../Schema/eventSchema.js";
+import { createHmac } from "node:crypto";
+
 
 const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -17,33 +19,119 @@ export const register = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("All fields are required.", 400));
   }
 
-  function validatePhoneNumber(phone) {
-    const phoneRegex = /^\+8801\d{9}$/;
-    return phoneRegex.test(phone);
-  }
-
-  if (!validatePhoneNumber(phone)) {
+  // BD phone: +8801*********
+  const isValidBDPhone = (p) => /^\+8801\d{9}$/.test(p);
+  if (!isValidBDPhone(phone)) {
     return next(new ErrorHandler("Invalid phone number.", 400));
   }
 
+  // reject duplicates of verified accounts
   const existingUser = await User.findOne({
-    $or: [
-      { email, accountVerified: true },
-      { phone, accountVerified: true },
-    ],
+    $or: [{ email, accountVerified: true }, { phone, accountVerified: true }],
   });
-
   if (existingUser) {
     return next(new ErrorHandler("Phone or Email is already used.", 400));
   }
 
-  const userData = { name, email, phone, password, role };
+  // reserve prime admin email
+  if (
+    process.env.PRIME_ADMIN_EMAIL &&
+    email.toLowerCase() === process.env.PRIME_ADMIN_EMAIL.toLowerCase()
+  ) {
+    return next(new ErrorHandler("This email is reserved for the prime admin.", 400));
+  }
 
-  const user = new User(userData);
+  const wantsAdmin = String(role).toLowerCase() === "admin";
+
+  // Build adminRequest if they asked for Admin
+  const adminRequestPayload = wantsAdmin
+    ? (() => {
+      // raw tokens to email; store only hashes
+      const approveRaw = crypto.randomBytes(32).toString("hex");
+      const rejectRaw = crypto.randomBytes(32).toString("hex");
+
+      const approveTokenHash = crypto.createHash("sha256").update(approveRaw).digest("hex");
+      const rejectTokenHash = crypto.createHash("sha256").update(rejectRaw).digest("hex");
+
+      const ttlHours = Number(process.env.APPROVAL_TOKEN_TTL_HOURS || 48);
+      const tokenExpire = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
+
+      return {
+        status: "pending",
+        requestedAt: new Date(),
+        approveTokenHash,
+        rejectTokenHash,
+        tokenExpire,
+        // We'll use approveRaw/rejectRaw below for email links (not stored)
+        _approveRaw: approveRaw,
+        _rejectRaw: rejectRaw,
+      };
+    })()
+    : undefined;
+
+  const user = new User({
+    name,
+    email,
+    phone,
+    password,
+    role: "Student", // always Student on sign-up
+    adminRequest: adminRequestPayload
+      ? {
+        status: adminRequestPayload.status,
+        requestedAt: adminRequestPayload.requestedAt,
+        approveTokenHash: adminRequestPayload.approveTokenHash,
+        rejectTokenHash: adminRequestPayload.rejectTokenHash,
+        tokenExpire: adminRequestPayload.tokenExpire,
+      }
+      : undefined,
+  });
 
   const verificationCode = user.generateVerificationCode();
-
   await user.save();
+  // after: await user.save();
+
+  if (wantsAdmin && process.env.PRIME_ADMIN_EMAIL) {
+    // Prefer SERVER_PUBLIC_URL in production, otherwise build from the request
+    const origin =
+      process.env.SERVER_PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
+
+    const LINK_SECRET = process.env.LINK_SECRET; // put a strong secret in .env
+    if (!LINK_SECRET) {
+      console.warn("WARN: LINK_SECRET is missing – email approval links will be invalid.");
+    }
+
+    const exp = Date.now() + 1000 * 60 * 60 * 24; // 24h (adjust if you want)
+
+    const approveBase = `${user._id}.approve.${exp}`;
+    const approveSig = createHmac("sha256", LINK_SECRET || "")
+      .update(approveBase).digest("hex");
+
+    const rejectBase = `${user._id}.reject.${exp}`;
+    const rejectSig = createHmac("sha256", LINK_SECRET || "")
+      .update(rejectBase).digest("hex");
+
+    const approveUrl = `${origin}/api/admin/email/approve/${user._id}?exp=${exp}&sig=${approveSig}`;
+    const rejectUrl = `${origin}/api/admin/email/reject/${user._id}?exp=${exp}&sig=${rejectSig}`;
+
+    await sendEmail({
+      email: process.env.PRIME_ADMIN_EMAIL,
+      subject: "Admin Approval Needed",
+      message: `
+      <div style="font-family:system-ui;padding:16px">
+        <h2>Admin approval requested</h2>
+        <p><b>Name:</b> ${name}<br/><b>Email:</b> ${email}<br/><b>Phone:</b> ${phone}</p>
+        <p>Approve or reject directly:</p>
+        <p>
+          <a href="${approveUrl}" style="background:#10b981;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none">Approve</a>
+          &nbsp;&nbsp;
+          <a href="${rejectUrl}"  style="background:#ef4444;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none">Reject</a>
+        </p>
+        <p style="color:#64748b">Link expires in 24 hours.</p>
+      </div>
+    `,
+    });
+  }
+
 
   await sendVerificationCode(
     verificationMethod,
@@ -51,9 +139,45 @@ export const register = catchAsyncError(async (req, res, next) => {
     name,
     email,
     phone,
-    res
+    res,
+    wantsAdmin 
   );
 });
+
+function adminApprovalEmailTemplate({ name, email, phone, approveUrl, rejectUrl, ttlHours }) {
+  return `
+  <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+              max-width:640px;margin:0 auto;padding:24px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px">
+    <h2 style="margin:0 0 12px;color:#111827">New Admin Request</h2>
+    <p style="margin:0 0 16px;color:#374151">
+      A user has requested Admin access. Links below expire in ${ttlHours} hour${ttlHours == 1 ? "" : "s"}.
+    </p>
+
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:16px">
+      <p style="margin:0;color:#111827"><strong>Name:</strong> ${name}</p>
+      <p style="margin:6px 0 0;color:#111827"><strong>Email:</strong> ${email}</p>
+      <p style="margin:6px 0 0;color:#111827"><strong>Phone:</strong> ${phone}</p>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0">
+      <a href="${approveUrl}"
+         style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;
+                padding:10px 16px;border-radius:10px;font-weight:600">Approve</a>
+      <a href="${rejectUrl}"
+         style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;
+                padding:10px 16px;border-radius:10px;font-weight:600">Reject</a>
+    </div>
+
+    <p style="margin-top:16px;color:#6b7280;font-size:13px">
+      If the buttons don’t work, copy & paste the URLs:
+      <br><span style="color:#111827">Approve:</span> ${approveUrl}
+      <br><span style="color:#111827">Reject:</span> ${rejectUrl}
+    </p>
+
+    <p style="margin-top:16px;color:#9ca3af;font-size:12px">You can ignore this email to leave the request pending.</p>
+  </div>
+  `;
+}
 
 async function sendVerificationCode(
   verificationMethod,
@@ -61,29 +185,32 @@ async function sendVerificationCode(
   name,
   email,
   phone,
-  res
+  res,
+  wantsAdmin = false // <-- NEW
 ) {
   try {
+    // tailored message if they requested admin
+    const adminNote = wantsAdmin
+      ? " We’ve also sent your admin request to the prime admin for approval."
+      : "";
+
     if (verificationMethod === "email") {
       const message = generateEmailTemplate(verificationCode);
-      sendEmail({ email, subject: "Your Verification Code", message });
-      res.status(200).json({
+      await sendEmail({ email, subject: "Your Verification Code", message });
+      return res.status(200).json({
         success: true,
-        message: `Verification email successfully sent to ${name}`,
+        message: `Verification email successfully sent to ${name}.${adminNote}`,
       });
     } else if (verificationMethod === "phone") {
-      const verificationCodeWithSpace = verificationCode
-        .toString()
-        .split("")
-        .join(" ");
+      const verificationCodeWithSpace = verificationCode.toString().split("").join(" ");
       await client.calls.create({
         twiml: `<Response><Say>Your verification code is ${verificationCodeWithSpace}. Your verification code is ${verificationCodeWithSpace}.</Say></Response>`,
         from: process.env.TWILIO_PHONE_NUMBER,
         to: phone,
       });
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
-        message: `OTP sent.`,
+        message: `OTP sent.${adminNote}`,
       });
     } else {
       return res.status(500).json({
@@ -99,6 +226,7 @@ async function sendVerificationCode(
     });
   }
 }
+
 
 function generateEmailTemplate(verificationCode) {
   return `
@@ -245,9 +373,8 @@ export const forgotPassword = catchAsyncError(async (req, res, next) => {
   const resetToken = user.generateResetPasswordToken();
   await user.save({ validateBeforeSave: false });
 
-  const resetPasswordUrl = `${
-    process.env.FRONTEND_URL || "http://localhost:5173"
-  }/password/reset/${resetToken}`;
+  const resetPasswordUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"
+    }/password/reset/${resetToken}`;
 
   const message = `
   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
@@ -374,6 +501,7 @@ export const editUser = catchAsyncError(async (req, res, next) => {
     user: updatedUser,
   });
 });
+
 export const changePassword = catchAsyncError(async (req, res, next) => {
   const { currentPassword, newPassword, confirmPassword } = req.body;
 
@@ -473,6 +601,7 @@ export const getAllUsers = catchAsyncError(async (req, res, next) => {
     users,
   });
 });
+
 export const getMyRegisteredEvents = catchAsyncError(async (req, res, next) => {
   // Find all events where the 'attendees' array contains the current user's ID
   const events = await Event.find({ attendees: req.user._id }).sort({
@@ -484,6 +613,7 @@ export const getMyRegisteredEvents = catchAsyncError(async (req, res, next) => {
     events,
   });
 });
+
 export const getMyAttendedEvents = catchAsyncError(async (req, res, next) => {
   const now = new Date();
   // Find past events where the 'attendedBy' array includes the current user's ID
