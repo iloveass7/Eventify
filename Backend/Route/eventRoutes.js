@@ -11,6 +11,9 @@ import {
   markAttendance,
   unmarkAttendance,
   updateAttendance,
+  listEventGallery,
+  uploadEventPhotos,
+  deleteEventPhoto,
 } from "../Controller/eventController.js";
 import { isAuthenticated } from "../Middleware/auth.js";
 import { isAdmin } from "../Middleware/adminAuth.js";
@@ -47,5 +50,15 @@ router
 router
   .route("/:id/attendance")
   .patch(isAuthenticated, isAdmin, updateAttendance);
+
+// Gallery
+router.route("/:id/gallery").get(listEventGallery);
+router
+  .route("/:id/gallery")
+  .post(isAuthenticated, isAdmin, upload.array("photos", 20), uploadEventPhotos); // up to 20 photos
+
+router
+  .route("/:id/gallery/:photoId")
+  .delete(isAuthenticated, isAdmin, deleteEventPhoto);
 
 export default router;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../components/ThemeContext";
 import DarkModeToggle from "../components/DarkModeToggle";
@@ -9,6 +9,11 @@ import {
   Clock,
   ArrowLeft,
   User,
+  Images as ImagesIcon,
+  Info,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { API_BASE } from "../config/api";
 
@@ -48,6 +53,24 @@ const EventDetails = () => {
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Tabs: "about" | "gallery"
+  const [activeTab, setActiveTab] = useState("about");
+
+  // Gallery state
+  const [gal, setGal] = useState({
+    items: [],
+    total: 0,
+    page: 1,
+    limit: 24,
+    loading: false,
+    error: "",
+    loadedOnce: false,
+  });
+
+  // Lightbox
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -76,7 +99,7 @@ const EventDetails = () => {
         } else {
           setError(eventData.message || "Could not fetch event details.");
         }
-      } catch (err) {
+      } catch {
         setError("Failed to connect to the server.");
       } finally {
         setLoading(false);
@@ -102,9 +125,57 @@ const EventDetails = () => {
   const isRegistrationClosed =
     (registrationDeadline && now > registrationDeadline) || hasEnded;
 
-  // Treat PrimeAdmin like Admin for registration restriction
   const isAdminish =
     currentUser?.role === "Admin" || currentUser?.role === "PrimeAdmin";
+
+  // Fetch gallery (after event has ended)
+  const fetchGallery = async (page = 1, limit = 24, append = false) => {
+    if (!hasEnded) return;
+    setGal((g) => ({ ...g, loading: true, error: "" }));
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/event/${id}/gallery?page=${page}&limit=${limit}`,
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Failed to load gallery");
+      setGal((g) => ({
+        items: append ? [...(g.items || []), ...(data.items || [])] : data.items || [],
+        total: data.total ?? (data.items?.length || 0),
+        page: data.page ?? page,
+        limit: data.limit ?? limit,
+        loading: false,
+        error: "",
+        loadedOnce: true,
+      }));
+    } catch (e) {
+      setGal((g) => ({ ...g, loading: false, error: e.message || "Failed to load gallery" }));
+    }
+  };
+
+  // Auto load gallery the first time tab opens (only if ended)
+  useEffect(() => {
+    if (activeTab === "gallery" && hasEnded && !gal.loadedOnce) {
+      fetchGallery(1, 24, false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, hasEnded]);
+
+  // Lightbox keyboard controls
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setLightboxOpen(false);
+      if (e.key === "ArrowRight")
+        setLightboxIndex((i) => (gal.items.length ? (i + 1) % gal.items.length : i));
+      if (e.key === "ArrowLeft")
+        setLightboxIndex((i) =>
+          gal.items.length ? (i - 1 + gal.items.length) % gal.items.length : i
+        );
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxOpen, gal.items.length]);
 
   const handleRegistrationToggle = async () => {
     if (!currentUser) {
@@ -112,7 +183,6 @@ const EventDetails = () => {
       navigate("/login");
       return;
     }
-    // Block only when trying to register (allow unregister if already registered)
     if (isAdminish && !isRegistered) {
       alert("Admins can’t register for events.");
       return;
@@ -282,43 +352,149 @@ const EventDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           {/* LEFT COLUMN */}
           <div className="lg:col-span-2 flex flex-col gap-6 h-full">
-            {/* Description */}
+            {/* Tabs card */}
             <div
-              className={`rounded-xl p-6 md:p-8 shadow border flex-1 flex flex-col ${
+              className={`rounded-xl shadow border ${
                 isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
               }`}
             >
-              <h2
-                className={`text-2xl font-bold mb-3 ${
-                  isDarkMode ? "text-gray-100" : "text-gray-900"
+              {/* Tabs header */}
+              <div
+                className={`flex items-center gap-2 border-b ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
                 }`}
               >
-                About this event
-              </h2>
-              <p
-                className={`leading-relaxed text-lg ${
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                {event.description}
-              </p>
+                <button
+                  onClick={() => setActiveTab("about")}
+                  className={`px-5 py-3 text-sm sm:text-base font-semibold inline-flex items-center gap-2 border-b-2 transition-colors
+                    ${
+                      activeTab === "about"
+                        ? "border-purple-600 text-purple-600"
+                        : isDarkMode
+                        ? "border-transparent text-gray-300 hover:text-gray-100"
+                        : "border-transparent text-gray-600 hover:text-gray-900"
+                    }`}
+                >
+                  <Info className="w-4 h-4" />
+                  About
+                </button>
 
-              {tags.length > 0 && (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {tags.map((t, i) => (
-                    <span
-                      key={`${t}-${i}`}
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        isDarkMode
-                          ? "bg-purple-900/40 text-purple-200 border border-purple-800"
-                          : "bg-purple-50 text-purple-700"
+                <button
+                  onClick={() => hasEnded && setActiveTab("gallery")}
+                  disabled={!hasEnded}
+                  className={`px-5 py-3 text-sm sm:text-base font-semibold inline-flex items-center gap-2 border-b-2 transition-colors
+                    ${
+                      activeTab === "gallery"
+                        ? "border-purple-600 text-purple-600"
+                        : isDarkMode
+                        ? "border-transparent text-gray-300 hover:text-gray-100"
+                        : "border-transparent text-gray-600 hover:text-gray-900"
+                    } ${!hasEnded ? "opacity-60 cursor-not-allowed" : ""}`}
+                  title={!hasEnded ? "Gallery available after the event ends" : undefined}
+                >
+                  <ImagesIcon className="w-4 h-4" />
+                  Gallery
+                </button>
+
+                <div className="ml-auto pr-4 text-xs sm:text-sm opacity-70">
+                  {activeTab === "gallery" && hasEnded
+                    ? gal.loading
+                      ? "Loading photos…"
+                      : gal.items.length
+                      ? `${gal.items.length} of ${gal.total} photos`
+                      : "No photos yet"
+                    : null}
+                </div>
+              </div>
+
+              {/* Tabs content */}
+              <div className="p-6 md:p-8">
+                {activeTab === "about" && (
+                  <>
+                    <h2
+                      className={`text-2xl font-bold mb-3 ${
+                        isDarkMode ? "text-gray-100" : "text-gray-900"
                       }`}
                     >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
+                      About this event
+                    </h2>
+                    <p
+                      className={`leading-relaxed text-lg ${
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      {event.description}
+                    </p>
+
+                    {normalizeTags(event.tags).length > 0 && (
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        {normalizeTags(event.tags).map((t, i) => (
+                          <span
+                            key={`${t}-${i}`}
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              isDarkMode
+                                ? "bg-purple-900/40 text-purple-200 border border-purple-800"
+                                : "bg-purple-50 text-purple-700"
+                            }`}
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {activeTab === "gallery" && hasEnded && (
+                  <>
+                    {gal.error && (
+                      <div className={isDarkMode ? "text-red-300 mb-3" : "text-red-600 mb-3"}>
+                        {gal.error}
+                      </div>
+                    )}
+
+                    {/* Grid */}
+                    {gal.items.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {gal.items.map((p, i) => (
+                          <button
+                            key={p._id || i}
+                            onClick={() => {
+                              setLightboxIndex(i);
+                              setLightboxOpen(true);
+                            }}
+                            className="group relative rounded-lg overflow-hidden border focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            title={p.caption || "View"}
+                          >
+                            <img
+                              src={p.url}
+                              alt={p.caption || "Event photo"}
+                              className="w-full h-40 object-cover group-hover:opacity-95 transition"
+                              loading="lazy"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                        {gal.loading ? "Loading…" : "No photos have been uploaded for this event yet."}
+                      </div>
+                    )}
+
+                    {/* Load more */}
+                    {gal.total > gal.items.length && (
+                      <div className="flex justify-center mt-5">
+                        <button
+                          onClick={() => fetchGallery((gal.page || 1) + 1, gal.limit || 24, true)}
+                          className="px-5 py-2 rounded-lg font-semibold bg-purple-700 text-white hover:bg-purple-800 transition"
+                        >
+                          Load more
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
             {/* CTA / Status */}
@@ -519,6 +695,62 @@ const EventDetails = () => {
           </div>
         </div>
       </div>
+
+      {/* Lightbox modal */}
+      {lightboxOpen && gal.items.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <div
+            className="relative max-w-6xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close */}
+            <button
+              className="absolute -top-10 right-0 text-white/90 hover:text-white"
+              onClick={() => setLightboxOpen(false)}
+              aria-label="Close"
+            >
+              <X className="w-7 h-7" />
+            </button>
+
+            {/* Prev / Next */}
+            <button
+              className="absolute left-0 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
+              onClick={() =>
+                setLightboxIndex((i) =>
+                  (i - 1 + gal.items.length) % gal.items.length
+                )
+              }
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-9 h-9" />
+            </button>
+            <button
+              className="absolute right-0 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
+              onClick={() =>
+                setLightboxIndex((i) => (i + 1) % gal.items.length)
+              }
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-9 h-9" />
+            </button>
+
+            {/* Image */}
+            <img
+              src={gal.items[lightboxIndex]?.url}
+              alt={gal.items[lightboxIndex]?.caption || "Event photo"}
+              className="w-full max-h-[80vh] object-contain rounded-lg shadow-lg"
+            />
+            {gal.items[lightboxIndex]?.caption && (
+              <div className="mt-3 text-center text-white/90">
+                {gal.items[lightboxIndex].caption}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -162,17 +162,18 @@ const GenerateCertificate = () => {
           </div>
 
           {/* Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-stretch">
             {sortedCompleted.map((event) => (
               <div
                 key={event._id}
-                className={`group rounded-2xl overflow-hidden border shadow-sm transition-all duration-300 min-h-[380px] ${
+                /* Make card a flex column so footer can pin to bottom; prevent height growth with clamped description */
+                className={`group rounded-2xl overflow-hidden border shadow-sm transition-all duration-300 h-full flex flex-col ${
                   isDarkMode
                     ? "bg-gray-800 border-gray-700 hover:border-gray-600 hover:shadow-lg hover:ring-1 hover:ring-purple-400/20"
                     : "bg-white border-gray-200 hover:border-gray-300 hover:shadow-lg hover:ring-1 hover:ring-purple-500/10"
                 }`}
               >
-                {/* Image */}
+                {/* Image + TAGS overlay */}
                 <div className="relative">
                   <img
                     src={event.image || FALLBACK_IMG}
@@ -192,10 +193,10 @@ const GenerateCertificate = () => {
                   </div>
                 </div>
 
-                {/* Body */}
-                <div className="p-5">
+                {/* Body (flex-1 so the footer can stick to bottom) */}
+                <div className="p-5 flex-1 flex flex-col">
                   <h3
-                    className={`text-lg sm:text-xl font-bold mb-1 break-words ${
+                    className={`text-lg sm:text-xl font-bold mb-2 break-words ${
                       isDarkMode ? "text-purple-300" : "text-purple-800"
                     }`}
                     title={event.name}
@@ -203,22 +204,27 @@ const GenerateCertificate = () => {
                     {event.name}
                   </h3>
 
-                  <p className={`${isDarkMode ? "text-gray-300" : "text-gray-700"} mb-3`}>
+                  {/* Clamp description to avoid cards expanding */}
+                  <p
+                    className={`${isDarkMode ? "text-gray-300" : "text-gray-700"} mb-3 line-clamp-3`}
+                  >
                     {event.description || "Thanks for participating!"}
                   </p>
 
                   {/* Meta row */}
                   <div
-                    className={`rounded-lg px-3 py-2 text-sm ${
+                    className={`rounded-lg px-3 py-2 text-sm mt-auto ${
                       isDarkMode ? "bg-gray-900/20 text-gray-200" : "bg-gray-50 text-gray-700"
                     }`}
                   >
                     <span className="opacity-70 mr-2">Completed on</span>
-                    <span className="font-semibold">{formatDate(event.endTime || event.startTime)}</span>
+                    <span className="font-semibold">
+                      {formatDate(event.endTime || event.startTime)}
+                    </span>
                   </div>
                 </div>
 
-                {/* Footer (always visible) */}
+                {/* Footer (pinned to bottom by flex layout) */}
                 <div
                   className={`px-5 pb-5 pt-4 border-t flex gap-3 ${
                     isDarkMode ? "border-gray-700" : "border-gray-200"

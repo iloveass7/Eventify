@@ -3,6 +3,7 @@ import ErrorHandler from "../Middleware/error.js";
 import Event from "../Schema/eventSchema.js";
 import { uploadToCloudinary } from "../Utils/cloudinary.js";
 import PDFDocument from "pdfkit";
+import { deleteFromCloudinary } from "../Utils/cloudinary.js";
 
 
 // No changes needed in viewAllEvents, createEvent, viewEvent
@@ -475,4 +476,96 @@ export const updateAttendance = catchAsyncError(async (req, res, next) => {
     } successfully.`,
     event,
   });
+});
+
+// GET gallery
+export const listEventGallery = catchAsyncError(async (req, res, next) => {
+  const event = await Event.findById(req.params.id).select("name endTime gallery");
+  if (!event) return next(new ErrorHandler("Event not found.", 404));
+
+  // OPTIONAL: if you only want to show gallery after end:
+  // if (new Date() < new Date(event.endTime)) {
+  //   return next(new ErrorHandler("Gallery will be available after the event ends.", 403));
+  // }
+
+  // Optional query: pagination
+  const page = Math.max(1, parseInt(req.query.page || "1", 10));
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || "24", 10)));
+  const start = (page - 1) * limit;
+  const end = start + limit;
+
+  const total = event.gallery.length;
+  const items = event.gallery.slice(start, end);
+
+  res.status(200).json({
+    success: true,
+    eventId: event._id,
+    total,
+    page,
+    limit,
+    items,
+  });
+});
+
+// POST multiple photos
+export const uploadEventPhotos = catchAsyncError(async (req, res, next) => {
+  const eventId = req.params.id;
+  const event = await Event.findById(eventId).select("endTime gallery");
+  if (!event) return next(new ErrorHandler("Event not found.", 404));
+
+  // Only after event is over
+  if (new Date() < new Date(event.endTime)) {
+    return next(new ErrorHandler("Photos can only be uploaded after the event has ended.", 400));
+  }
+
+  // Expect Multer 'photos' field (array)
+  const files = req.files || [];
+  if (!files.length) return next(new ErrorHandler("No photos uploaded.", 400));
+
+  // Upload sequentially or in parallel; parallel is faster:
+  const uploads = await Promise.all(
+    files.map(async (file) => {
+      const result = await uploadToCloudinary(file.buffer, "event_galleries");
+      return {
+        url: result.secure_url,
+        publicId: result.public_id,
+        caption: req.body.caption || "", // single caption for all; you can expand to per-file
+        uploadedBy: req.user._id,
+      };
+    })
+  );
+
+  // Push as a batch
+  event.gallery.push(...uploads);
+  await event.save();
+
+  res.status(201).json({
+    success: true,
+    message: "Photos uploaded.",
+    added: uploads.length,
+    photos: uploads,
+  });
+});
+
+// DELETE single photo by subdocument _id
+export const deleteEventPhoto = catchAsyncError(async (req, res, next) => {
+  const { id: eventId, photoId } = req.params;
+
+  const event = await Event.findById(eventId).select("gallery");
+  if (!event) return next(new ErrorHandler("Event not found.", 404));
+
+  const photo = event.gallery.id(photoId);
+  if (!photo) return next(new ErrorHandler("Photo not found.", 404));
+
+  // Remove from Cloudinary (best-effort)
+  try {
+    await deleteFromCloudinary(photo.publicId);
+  } catch (e) {
+    // If this fails, we still proceed to remove DB record to prevent zombie entries.
+  }
+
+  photo.deleteOne(); // remove subdoc
+  await event.save();
+
+  res.status(200).json({ success: true, message: "Photo deleted." });
 });
