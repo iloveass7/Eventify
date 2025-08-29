@@ -7,7 +7,7 @@ import { Music, Camera, Ticket, PartyPopper, Mic2 } from "lucide-react";
 const Sponsors = ({ isDarkMode }) => {
   return (
     <section
-      className={`px-4 md:px-20 lg:px-23 pt-10 transition-colors duration-500 ${
+      className={`px-4 md:px-20 lg:px-23 py-10 transition-colors duration-500 ${
         isDarkMode ? "bg-gray-900" : "bg-white"
       }`}
     >

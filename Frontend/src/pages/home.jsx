@@ -1,6 +1,5 @@
 import React from "react";
 import { useTheme } from "../components/ThemeContext";
-import DarkModeToggle from "../components/DarkModeToggle";
 import Hero from "../components/Hero";
 import Sponsors from "../components/Sponsors";
 import RecommendedEvents from "../components/RecommendedEvents";
@@ -17,9 +16,6 @@ const Home = () => {
           : "bg-white"
       }`}
     >
-      {/* Global Dark Mode Toggle - Will float on all pages */}
-      <DarkModeToggle />
-
       {/* Pass isDarkMode to components that need it */}
       <div className={isDarkMode ? "dark" : ""}>
         <Hero isDarkMode={isDarkMode} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "../../components/ThemeContext";
 import DarkModeToggle from "../../components/DarkModeToggle";
 import AllEvents from "./AllEvents";
@@ -9,15 +9,26 @@ import AdminProfile from "./AdminProfile";
 import QuickStats from "./QuickStats";
 import Approval from "./Approval";
 
+const VALID_TABS = ["events", "create", "edit", "stats", "approval", "profile"];
+
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState("events");
-  const [loading, setLoading] = useState(false);
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // initial tab: URL > localStorage > "events"
+  const urlTab = searchParams.get("tab");
+  const initialTab = VALID_TABS.includes(urlTab)
+    ? urlTab
+    : localStorage.getItem("admin_dash_tab") || "events";
+
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [loading, setLoading] = useState(false);
 
   const handleTabChange = (tab) => {
     setLoading(true);
     setActiveTab(tab);
+    setSearchParams({ tab }); // keep tab in the URL to survive refresh/back/forward
   };
 
   const handleLogout = () => {
@@ -25,15 +36,12 @@ const AdminDashboard = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("auth_user");
     localStorage.removeItem("user");
-    
-    // Optionally, reset any local state or context for authentication
-    // You can also use a context to set the user as null, if you manage global auth state
-    
-    // Navigate to the login page
+    localStorage.removeItem("admin_dash_tab");
     navigate("/login");
   };
 
   const handleBackToHome = () => {
+    localStorage.removeItem("admin_dash_tab");
     navigate("/");
   };
 
@@ -42,6 +50,20 @@ const AdminDashboard = () => {
     const timeout = setTimeout(() => setLoading(false), 600);
     return () => clearTimeout(timeout);
   }, [activeTab]);
+
+  // Persist last chosen tab as a fallback
+  useEffect(() => {
+    localStorage.setItem("admin_dash_tab", activeTab);
+  }, [activeTab]);
+
+  // Respond to browser back/forward changing ?tab=
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (VALID_TABS.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <div
@@ -68,21 +90,19 @@ const AdminDashboard = () => {
           </h2>
 
           {[
-            { tab: "events", label: "All Events", icon: "" },
-            { tab: "create", label: "Create Events", icon: "" },
-            { tab: "edit", label: "Manage Events", icon: "" },
-            { tab: "stats", label: "Quick Stats", icon: "" },
-            { tab: "approval", label: "Approvals", icon: "" },
-            { tab: "profile", label: "Profile", icon: "" },
-          ].map(({ tab, label, icon }) => (
+            { tab: "events", label: "All Events" },
+            { tab: "create", label: "Create Events" },
+            { tab: "edit", label: "Manage Events" },
+            { tab: "stats", label: "Quick Stats" },
+            { tab: "approval", label: "Approvals" },
+            { tab: "profile", label: "Profile" },
+          ].map(({ tab, label }) => (
             <button
               key={tab}
               onClick={() => handleTabChange(tab)}
               className={`text-xl w-full text-left px-4 py-3 font-medium rounded-lg transition-all duration-200 flex items-center ${
                 activeTab === tab
-                  ? isDarkMode
-                    ? "bg-purple-600 text-white"
-                    : "bg-purple-600 text-white"
+                  ? "bg-purple-600 text-white"
                   : isDarkMode
                   ? "text-gray-300 hover:bg-gray-700 hover:text-white"
                   : "text-purple-100 hover:bg-purple-700 hover:text-white"
@@ -95,7 +115,6 @@ const AdminDashboard = () => {
 
         {/* Navigation Buttons */}
         <div className="space-y-3">
-          {/* Back to Home Button */}
           <button
             onClick={handleBackToHome}
             className={`w-full py-3 rounded-lg text-xl font-medium flex items-center justify-center transition-colors duration-200 ${
@@ -106,8 +125,7 @@ const AdminDashboard = () => {
           >
             Back to Home
           </button>
-          
-          {/* Logout Button */}
+
           <button
             onClick={handleLogout}
             className="w-full py-3 rounded-lg text-xl font-bold flex items-center justify-center transition-colors duration-200 bg-red-600 hover:bg-red-500 text-white"
@@ -136,7 +154,7 @@ const AdminDashboard = () => {
             }`}
           >
             <h1
-              className={`h-10 text-[2.4rem] font-bold mb-6 transition-colors duration-500 ${
+              className={`px-7 py-4 h-10 text-[2.4rem] font-bold mb-6 transition-colors duration-500 ${
                 isDarkMode ? "text-purple-400" : "text-purple-800"
               }`}
             >

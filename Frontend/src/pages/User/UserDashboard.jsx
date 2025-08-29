@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "../../components/ThemeContext";
 import DarkModeToggle from "../../components/DarkModeToggle";
 import AllEvents from "../Admin/AllEvents";
@@ -7,32 +7,60 @@ import MyEvents from "./MyEvents";
 import UserProfile from "./UserProfile";
 import GenerateCertificate from "./GenerateCertificate";
 
+const VALID_TABS = ["events", "personal", "generate", "profile"];
+
 const UserDashboard = () => {
-  const [activeTab, setActiveTab] = useState("events");
-  const [loading, setLoading] = useState(false);
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ---- Initial tab from URL or last-saved, fallback to "events"
+  const urlTab = searchParams.get("tab");
+  const initialTab = VALID_TABS.includes(urlTab)
+    ? urlTab
+    : localStorage.getItem("user_dash_tab") || "events";
+
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [loading, setLoading] = useState(false);
 
   const handleTabChange = (tab) => {
     setLoading(true);
     setActiveTab(tab);
+    setSearchParams({ tab }); // keep tab in the URL (survives refresh/back/forward)
   };
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("auth_user");
     localStorage.removeItem("user");
+    localStorage.removeItem("user_dash_tab");
     navigate("/login");
   };
 
   const handleBackToHome = () => {
-    navigate("/");
+    localStorage.removeItem("user_dash_tab");
+    navigate("/")
   };
 
+  // Simulate loading delay (matches AdminDashboard)
   useEffect(() => {
     const timeout = setTimeout(() => setLoading(false), 600);
     return () => clearTimeout(timeout);
   }, [activeTab]);
+
+  // Persist last chosen tab (nice fallback if URL missing)
+  useEffect(() => {
+    localStorage.setItem("user_dash_tab", activeTab);
+  }, [activeTab]);
+
+  // Respond to browser back/forward changing ?tab=
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (VALID_TABS.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <div
@@ -43,17 +71,17 @@ const UserDashboard = () => {
       {/* Dark Mode Toggle */}
       <DarkModeToggle />
 
-      {/* Sidebar */}
+      {/* Sidebar (mirrors AdminDashboard styling) */}
       <div
-        className={`w-full lg:w-100 shadow-xl flex flex-col justify-between p-5 sm:p-6 space-y-4 sm:space-y-5 transition-colors duration-500 ${
+        className={`w-full lg:w-100 shadow-xl flex flex-col justify-between p-6 space-y-5 transition-colors duration-500 ${
           isDarkMode ? "bg-gray-800 border-r border-gray-700" : "bg-purple-900"
         }`}
       >
-        <div className="space-y-4 sm:space-y-5">
+        <div className="space-y-5">
           <h2
-            className={`text-center font-bold mb-4 sm:mb-6 pt-2 sm:pt-5 transition-colors duration-500 ${
+            className={`text-center text-[2.4rem] font-bold mb-6 pt-5 transition-colors duration-500 ${
               isDarkMode ? "text-gray-100" : "text-white"
-            } text-2xl sm:text-3xl md:text-4xl leading-tight`}
+            }`}
           >
             User Dashboard
           </h2>
@@ -67,13 +95,13 @@ const UserDashboard = () => {
             <button
               key={tab}
               onClick={() => handleTabChange(tab)}
-              className={`w-full text-left px-4 py-2 sm:py-3 font-medium rounded-lg transition-all duration-200 flex items-center
-                ${activeTab === tab
+              className={`text-xl w-full text-left px-4 py-3 font-medium rounded-lg transition-all duration-200 flex items-center ${
+                activeTab === tab
                   ? "bg-purple-600 text-white"
                   : isDarkMode
                   ? "text-gray-300 hover:bg-gray-700 hover:text-white"
-                  : "text-purple-100 hover:bg-purple-700 hover:text-white"}
-                text-base sm:text-lg`}
+                  : "text-purple-100 hover:bg-purple-700 hover:text-white"
+              }`}
             >
               {label}
             </button>
@@ -81,19 +109,21 @@ const UserDashboard = () => {
         </div>
 
         {/* Navigation Buttons */}
-        <div className="space-y-2.5 sm:space-y-3">
+        <div className="space-y-3">
           <button
             onClick={handleBackToHome}
-            className={`w-full py-2.5 sm:py-3 rounded-lg font-medium flex items-center justify-center transition-colors duration-200
-              ${isDarkMode ? "bg-purple-700 hover:bg-purple-500 text-white" : "bg-purple-700 hover:bg-purple-500 text-white"}
-              text-base sm:text-lg`}
+            className={`w-full py-3 rounded-lg text-xl font-medium flex items-center justify-center transition-colors duration-200 ${
+              isDarkMode
+                ? "bg-purple-700 hover:bg-purple-500 text-white"
+                : "bg-purple-700 hover:bg-purple-500 text-white"
+            }`}
           >
             Back to Home
           </button>
 
           <button
             onClick={handleLogout}
-            className="w-full py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center transition-colors duration-200 bg-red-600 hover:bg-red-500 text-white text-base sm:text-lg"
+            className="w-full py-3 rounded-lg text-xl font-bold flex items-center justify-center transition-colors duration-200 bg-red-600 hover:bg-red-500 text-white"
           >
             Logout
           </button>
@@ -101,27 +131,27 @@ const UserDashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-5 sm:p-6 md:p-8">
+      <div className="flex-1 p-6 md:p-8">
         {loading ? (
-          <div className="flex justify-center items-center h-56 sm:h-64">
+          <div className="flex justify-center items-center h-64">
             <div
-              className={`font-semibold transition-colors duration-500 ${
+              className={`text-2xl font-semibold transition-colors duration-500 ${
                 isDarkMode ? "text-gray-300" : "text-gray-700"
-              } text-lg sm:text-xl md:text-2xl`}
+              }`}
             >
               Loading
             </div>
           </div>
         ) : (
           <div
-            className={`rounded-lg shadow p-5 sm:p-6 pt-3 transition-colors duration-500 ${
+            className={`rounded-lg shadow p-6 pt-3 transition-colors duration-500 ${
               isDarkMode ? "bg-gray-800" : "bg-white"
             }`}
           >
             <h1
-              className={`font-bold mb-4 sm:mb-6 transition-colors duration-500 ${
+              className={`px-7 py-4 h-10 text-[2.4rem] font-bold mb-6 transition-colors duration-500 ${
                 isDarkMode ? "text-purple-400" : "text-purple-800"
-              } text-2xl sm:text-3xl md:text-4xl leading-tight break-words`}
+              }`}
             >
               {activeTab === "events" && "All Events"}
               {activeTab === "personal" && "My Events"}

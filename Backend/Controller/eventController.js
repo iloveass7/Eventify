@@ -4,6 +4,7 @@ import Event from "../Schema/eventSchema.js";
 import { uploadToCloudinary } from "../Utils/cloudinary.js";
 import PDFDocument from "pdfkit";
 
+
 // No changes needed in viewAllEvents, createEvent, viewEvent
 // No changes needed in registerForEvent, unregisterFromEvent
 
@@ -170,14 +171,18 @@ export const unregisterFromEvent = catchAsyncError(async (req, res, next) => {
 
 export const generateCertificate = catchAsyncError(async (req, res, next) => {
   const eventId = req.params.id;
-  const userId = req.user._id;
-  const event = await Event.findById(eventId);
-  if (!event) {
-    return next(new ErrorHandler("Event not found.", 404));
-  }
+  const userId = String(req.user?._id || "");
 
-  // FIX: Check against 'endTime' to see if the event is over
-  if (new Date() < new Date(event.endTime)) {
+  const event = await Event.findById(eventId).select(
+    "name startTime endTime attendedBy organizer"
+  );
+  if (!event) return next(new ErrorHandler("Event not found.", 404));
+
+  const now = new Date();
+  const end = event.endTime ? new Date(event.endTime) : null;
+  const start = event.startTime ? new Date(event.startTime) : null;
+  const hasEnded = end ? now >= end : start ? now >= start : false;
+  if (!hasEnded) {
     return next(
       new ErrorHandler(
         "Cannot generate certificate before the event has occurred.",
@@ -186,87 +191,156 @@ export const generateCertificate = catchAsyncError(async (req, res, next) => {
     );
   }
 
-  if (!event.attendedBy.includes(userId)) {
+  const attended =
+    Array.isArray(event.attendedBy) &&
+    event.attendedBy.some((v) => String(v) === userId);
+  if (!attended) {
     return next(
       new ErrorHandler("Your attendance for this event was not confirmed.", 403)
     );
   }
 
-  const doc = new PDFDocument({ layout: "landscape", size: "A4" });
+  const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 36 });
+
+  const safeName = (event.name || "Event")
+    .replace(/[^\w\- ]+/g, "")
+    .replace(/\s+/g, "_");
+
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename=Certificate_${event.name.replace(/\s/g, "_")}.pdf`
+    `attachment; filename="Certificate_${safeName}.pdf"`
   );
+
   doc.pipe(res);
-  // --- PDF Content ---
-  doc.rect(30, 30, doc.page.width - 60, doc.page.height - 60).stroke();
+
+  const { width, height } = doc.page;
+  const purple = "#4B0082";
+  const purple2 = "#6b21a8";
+  const magenta = "#CE4ECC";
+
+  // Background
+  doc.rect(0, 0, width, height).fill("#FFFFFF");
+
+  // Top-right decoration
   doc
-    .fontSize(24)
+    .save()
+    .fillColor(purple)
+    .polygon([width, 0], [width - 180, 0], [width, 120])
+    .fill();
+  doc.fillColor(purple2).polygon([width - 40, 0], [width - 260, 0], [width - 80, 180]).fill();
+  doc
+    .lineWidth(3)
+    .strokeColor(magenta)
+    .polygon([width - 70, 30], [width - 10, 90], [width - 70, 150], [width - 130, 90])
+    .stroke()
+    .restore();
+
+  // Bottom-left decoration
+  doc
+    .save()
+    .fillColor(purple)
+    .polygon([0, height], [0, height - 190], [190, height])
+    .fill();
+  doc.fillColor(purple2).polygon([0, height], [0, height - 120], [120, height]).fill();
+  doc
+    .strokeColor(magenta)
+    .lineWidth(3)
+    .polygon([18, height - 150], [150, height - 18], [18, height - 18], [-114, height - 150])
+    .stroke()
+    .restore();
+
+  // Title
+  doc
+    .fillColor("#000")
     .font("Helvetica-Bold")
-    .fillColor("#4B0082")
-    .text("Certificate of Completion", 0, 80, { align: "center" });
+    .fontSize(40)
+    .text("CERTIFICATE", 0, 90, { align: "center" });
+  doc.font("Helvetica").fontSize(20).text("OF ACHIEVEMENT", { align: "center", characterSpacing: 2 });
+
+  // Recipient
+  doc.moveDown(1.2);
+  doc.font("Helvetica").fontSize(14).text("This certificate is awarded to:", { align: "center" });
+  doc.moveDown(0.6);
+  doc.font("Helvetica-BoldOblique").fontSize(36).fillColor(purple2).text(req.user.name || "Participant", { align: "center" });
+
+  // Highlighted event name
+  doc.moveDown(0.2);
   doc
-    .fontSize(18)
-    .font("Helvetica")
-    .fillColor("black")
-    .text(`This certificate acknowledges that`, { align: "center" });
-  doc.moveDown(1);
-  doc
+    .font("Helvetica-Bold")
     .fontSize(28)
-    .font("Helvetica-Bold")
-    .fillColor("blue")
-    .text(req.user.name, { align: "center" });
-  doc.moveDown(1);
+    .fillColor(purple)
+    .text(event.name || "Event", { align: "center" });
+
+  // Separator
+  doc.moveDown(0.6);
+  const sepY = doc.y + 15;
+  doc.moveTo(120, sepY).lineTo(width - 120, sepY).lineWidth(1).strokeColor("#888").stroke();
+
+  // Short body line
   doc
-    .fontSize(16)
+    .moveDown(1)
     .font("Helvetica")
-    .fillColor("black")
-    .text("has successfully completed", { align: "center" });
-  doc.moveDown(0.5);
+    .fontSize(15)
+    .fillColor("#111")
+    .text(
+      `Successfully completed participation in the program organized by ${event.organizer?.name || "the organizer"}.`,
+      100,
+      undefined,
+      { align: "center", width: width - 200 }
+    );
+
+  // QR (top-left, small)
+  try {
+    const { default: QRCode } = await import("qrcode");
+    const payload = `${req.protocol}://${req.get("host")}/verify-certificate?e=${event._id}&u=${userId}`;
+    const dataURL = await QRCode.toDataURL(payload, {
+      margin: 0,
+      width: 90,
+      color: { dark: "#000000", light: "#0000" },
+    });
+    const png = Buffer.from(dataURL.split(",")[1], "base64");
+    doc.image(png, 40, 44, { width: 90 });
+  } catch {
+    // QR optional
+  }
+
+  // ---- Footer (shifted right & bold date) ----
+  const issueDate = end || start || now;
+  const baseY = height - 96;
+
+  // 1) Completion Date: shifted right & bold
+  const dateX = 180; // was 100 — moved right to clear decoration
   doc
-    .fontSize(20)
-    .font("Helvetica-Bold")
-    .text(`${event.name} Training Program`, { align: "center" });
-  doc.moveDown(1);
+    .font("Helvetica-Bold") // make date bold
+    .fontSize(12)
+    .fillColor("#000")
+    .text(
+      `Completion Date: ${issueDate.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })}`,
+      dateX,
+      baseY
+    );
+
+  // 2) Organizer Signature line — nudged right a bit as well
+  const lineLeft = width - 340;  // was width - 360
+  const lineRight = width - 140; // was width - 160
+  doc.strokeColor("#999").moveTo(lineLeft, baseY).lineTo(lineRight, baseY).stroke();
   doc
-    .fontSize(14)
-    .font("Helvetica")
-    .text(`Ensuring expertise in event participation and program standards.`, {
+    .font("Helvetica-Oblique")
+    .fontSize(11)
+    .fillColor("#000")
+    .text("Organizer Signature", lineLeft, baseY + 6, {
+      width: lineRight - lineLeft,
       align: "center",
-      width: 700,
     });
 
-  // FIX: Use 'startTime' for the event date on the certificate
-  const eventDate = new Date(event.startTime).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  const expiryDate = new Date(event.startTime);
-  expiryDate.setFullYear(expiryDate.getFullYear() + 3);
+  // Outer border
+  doc.lineWidth(1.2).strokeColor("#e5e7eb").rect(24, 24, width - 48, height - 48).stroke();
 
-  doc.moveDown(2);
-  doc.fontSize(12).text(`Date of Issuance: ${eventDate}`, 100, 350);
-  doc
-    .fontSize(12)
-    .text(
-      `Date of Validity: ${expiryDate.toLocaleDateString("en-US")}`,
-      100,
-      370
-    );
-  doc.fontSize(12).text("_________________________", 100, 450);
-  doc.text("Event Organizer", 120, 470);
-  const badgeX = doc.page.width - 180;
-  const badgeY = 350;
-  doc.circle(badgeX, badgeY, 60).fillAndStroke("#4B0082", "black");
-  doc
-    .fillColor("white")
-    .font("Helvetica-Bold")
-    .fontSize(16)
-    .text("8", badgeX - 5, badgeY - 20);
-  doc.text("CPD", badgeX - 18, badgeY);
-  doc.text("POINTS", badgeX - 30, badgeY + 20);
   doc.end();
 });
 

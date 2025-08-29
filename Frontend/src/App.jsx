@@ -1,21 +1,87 @@
-import { Routes, Route, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import MainLayout from "./components/layouts/mainLayout";
-import InterstsSelect from "./pages/interstsSelect";
-import AdminDashboard from "./pages/Admin/AdminDashboard";
-import { ThemeProvider } from "./components/ThemeContext";
-import UserDashboard from "./pages/User/UserDashboard";
-import RegisterPage from "./pages/RegisterPage";
-import LoginPage from "./pages/LoginPage";
+import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import DarkModeToggle from "./components/DarkModeToggle";
 import Chat from "./components/chat";
+import { ThemeProvider } from "./components/ThemeContext";
+import NotificationProvider, { useNotify } from "./components/NotificationProvider";
+import ScrollToTop from "./components/ScrollToTop";
+import PublicShell from "./components/PublicShell";
+import Home from "./pages/home";
+import About from "./pages/About";
+import Events from "./pages/Events";
+import EventDetails from "./pages/EventDetails";
+import PasswordResetPage from "./components/PasswordResetPage";
+import InterstsSelect from "./pages/interstsSelect";
+import RegisterPage from "./pages/RegisterPage";
+import LoginPage from "./pages/LoginPage";
+import AdminDashboard from "./pages/Admin/AdminDashboard";
+import UserDashboard from "./pages/User/UserDashboard";
 
-function App() {
+/* ---------------- helpers ---------------- */
+function getStoredUserRole() {
+  try {
+    const raw = localStorage.getItem("auth_user");
+    return raw ? JSON.parse(raw)?.role || null : null;
+  } catch {
+    return null;
+  }
+}
+
+/* ---------------- route guards ---------------- */
+function PublicOnlyRoute({ children }) {
+  const notify = useNotify();
+  const role = getStoredUserRole();
+  const notified = useRef(false);
+
+  if (role) {
+    if (!notified.current) {
+      notify("You're already logged in.", "info");
+      notified.current = true;
+    }
+    return <Navigate to={role === "Admin" ? "/admin" : "/user"} replace />;
+  }
+  return children;
+}
+
+function AdminRoute({ children }) {
+  const notify = useNotify();
+  const role = getStoredUserRole();
+  const location = useLocation();
+  const notified = useRef(false);
+
+  if (role === "Admin") return children;
+
+  if (!notified.current) {
+    notify(role ? "Unauthorized: Admins only." : "Please log in to continue.", role ? "error" : "warning");
+    notified.current = true;
+  }
+  return <Navigate to="/login" replace state={{ from: location }} />;
+}
+
+function StudentRoute({ children }) {
+  const notify = useNotify();
+  const role = getStoredUserRole();
+  const location = useLocation();
+  const notified = useRef(false);
+
+  if (role === "Student") return children;
+
+  if (!notified.current) {
+    notify(role ? "Unauthorized: Students only." : "Please log in to continue.", role ? "error" : "warning");
+    notified.current = true;
+  }
+  return <Navigate to="/login" replace state={{ from: location }} />;
+}
+
+/* ---------------- inner app (under provider) ---------------- */
+function AppContent() {
   const navigate = useNavigate();
+  const notify = useNotify();
+  const location = useLocation();
 
-  // Track user login state
+  // For Navbar/Footer visibility (and any future needs)
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
 
@@ -23,61 +89,124 @@ function App() {
     const storedUser = localStorage.getItem("auth_user");
     if (storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        setUserRole(parsedUser.role); // Set user role
+        const parsed = JSON.parse(storedUser);
+        setUser(parsed);
+        setUserRole(parsed?.role || null);
       } catch {
         setUser(null);
         setUserRole(null);
       }
+    } else {
+      setUser(null);
+      setUserRole(null);
     }
+
+    const onStorage = (e) => {
+      if (e.key === "auth_user" || e.key === "auth_token") {
+        const raw = localStorage.getItem("auth_user");
+        try {
+          const parsed = raw ? JSON.parse(raw) : null;
+          setUser(parsed);
+          setUserRole(parsed?.role || null);
+        } catch {
+          setUser(null);
+          setUserRole(null);
+        }
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const handleLogout = () => {
-    // Clear everything from local storage and state
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
     setUser(null);
     setUserRole(null);
+    notify("You’ve been logged out.", "success");
     navigate("/login");
   };
 
+  // Hide navbar/footer on auth pages & dashboards (same behavior you had)
+  const hideChromePaths = ["/login", "/register", "/admin", "/user"];
+  const shouldHideChrome = hideChromePaths.includes(location.pathname);
+
   return (
-    <ThemeProvider>
-      <div className="flex flex-col justify-center items-center w-max-screen overflow-x-hidden min-h-screen">
-        {/* Conditional rendering of Navbar and Footer based on user role and routes */}
-        {!["/login", "/register", "/admin", "/user"].includes(window.location.pathname) && (
-          <>
-            <Navbar />
-          </>
-        )}
+    <>
+      <ScrollToTop />
+
+      {/* Full-width app container (no centering) */}
+      <div className="min-h-screen w-full overflow-x-hidden">
+        {!shouldHideChrome && <Navbar />}
+
+        {/* Global UI */}
         <DarkModeToggle />
         <Chat />
+
         <Routes>
-          {/* Public Routes */}
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/interests" element={<InterstsSelect />} />
+          {/* Public (blocked if already logged in) */}
+          <Route
+            path="/register"
+            element={
+              <PublicOnlyRoute>
+                <RegisterPage />
+              </PublicOnlyRoute>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <PublicOnlyRoute>
+                <LoginPage />
+              </PublicOnlyRoute>
+            }
+          />
 
-          {/* Admin & User Dashboards */}
-          {userRole === "Admin" && (
-            <Route path="/admin" element={<AdminDashboard handleLogout={handleLogout} />} />
-          )}
-          {userRole === "Student" && (
-            <Route path="/user" element={<UserDashboard handleLogout={handleLogout} />} />
-          )}
+          {/* Public routes (wrapped by PublicShell; replaces MainLayout) */}
+          <Route element={<PublicShell />}>
+            <Route index element={<Home />} />
+            <Route path="about" element={<About />} />
+            <Route path="events" element={<Events />} />
+            <Route path="events/:id" element={<EventDetails />} />
+            <Route path="password/reset/:token" element={<PasswordResetPage />} />
+            <Route path="interests" element={<InterstsSelect />} />
+          </Route>
 
-          {/* Main Layout Routes */}
-          <Route path="/*" element={<MainLayout />} />
+          {/* Protected dashboards */}
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminDashboard handleLogout={handleLogout} />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/user"
+            element={
+              <StudentRoute>
+                <UserDashboard handleLogout={handleLogout} />
+              </StudentRoute>
+            }
+          />
+
+          {/* Catch-all → Home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
-        {/* Conditional rendering of Footer */}
-        {!["/login", "/register", "/admin", "/user"].includes(window.location.pathname) && (
-          <Footer />
-        )}
+        {!shouldHideChrome && <Footer />}
       </div>
-    </ThemeProvider>
+    </>
   );
 }
 
-export default App;
+/* ---------------- outer app (providers) ---------------- */
+export default function App() {
+  return (
+    <ThemeProvider>
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
+    </ThemeProvider>
+  );
+}

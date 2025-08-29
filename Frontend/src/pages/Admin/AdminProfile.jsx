@@ -12,6 +12,8 @@ import {
   Eye,
   EyeOff,
   Clock,
+  Calendar,
+  Users
 } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
 
@@ -315,9 +317,8 @@ const AdminProfile = () => {
 
       {/* Main Profile Card */}
       <div
-        className={`pb-5 rounded-lg shadow-lg overflow-hidden transition-colors duration-500 ${
-          isDarkMode ? "bg-gray-800" : "bg-white"
-        }`}
+        className={`pb-5 rounded-lg shadow-lg overflow-hidden transition-colors duration-500 ${isDarkMode ? "bg-gray-800" : "bg-white"
+          }`}
       >
         {/* Profile Header */}
         <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-8">
@@ -391,11 +392,10 @@ const AdminProfile = () => {
             {/* Personal Information */}
             <div className="space-y-6">
               <h3
-                className={`text-2xl font-bold border-b pb-2 transition-colors duration-500 ${
-                  isDarkMode
+                className={`text-2xl font-bold border-b pb-2 transition-colors duration-500 ${isDarkMode
                     ? "text-gray-100 border-gray-600"
                     : "text-gray-900 border-gray-200"
-                }`}
+                  }`}
               >
                 Personal Information
               </h3>
@@ -403,15 +403,13 @@ const AdminProfile = () => {
               {/* Name */}
               <div className="flex items-center space-x-3">
                 <User
-                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-400"
-                  }`}
+                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${isDarkMode ? "text-gray-400" : "text-gray-400"
+                    }`}
                 />
                 <div className="flex-1">
                   <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
+                    className={`text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
                   >
                     Full Name
                   </label>
@@ -421,17 +419,15 @@ const AdminProfile = () => {
                       name="name"
                       value={editForm.name}
                       onChange={handleInputChange}
-                      className={`w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors duration-500 ${
-                        isDarkMode
+                      className={`w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors duration-500 ${isDarkMode
                           ? "bg-gray-700 border-gray-600 text-gray-100"
                           : "bg-white border-gray-300 text-gray-900"
-                      }`}
+                        }`}
                     />
                   ) : (
                     <p
-                      className={`font-medium text-lg transition-colors duration-500 ${
-                        isDarkMode ? "text-gray-200" : "text-gray-900"
-                      }`}
+                      className={`font-medium text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-200" : "text-gray-900"
+                        }`}
                     >
                       {userInfo.name}
                     </p>
@@ -442,22 +438,19 @@ const AdminProfile = () => {
               {/* Email */}
               <div className="flex items-center space-x-3">
                 <Mail
-                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-400"
-                  }`}
+                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${isDarkMode ? "text-gray-400" : "text-gray-400"
+                    }`}
                 />
                 <div className="flex-1">
                   <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
+                    className={`text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
                   >
                     Email Address
                   </label>
                   <p
-                    className={`font-medium text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-200" : "text-gray-900"
-                    }`}
+                    className={`font-medium text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-200" : "text-gray-900"
+                      }`}
                   >
                     {userInfo.email}
                   </p>
@@ -467,15 +460,13 @@ const AdminProfile = () => {
               {/* Phone */}
               <div className="flex items-center space-x-3">
                 <Phone
-                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-400"
-                  }`}
+                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${isDarkMode ? "text-gray-400" : "text-gray-400"
+                    }`}
                 />
                 <div className="flex-1">
                   <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
+                    className={`text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
                   >
                     Phone Number
                   </label>
@@ -485,17 +476,15 @@ const AdminProfile = () => {
                       name="phone"
                       value={editForm.phone || ""}
                       onChange={handleInputChange}
-                      className={`w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors duration-500 ${
-                        isDarkMode
+                      className={`w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors duration-500 ${isDarkMode
                           ? "bg-gray-700 border-gray-600 text-gray-100"
                           : "bg-white border-gray-300 text-gray-900"
-                      }`}
+                        }`}
                     />
                   ) : (
                     <p
-                      className={`font-medium text-lg transition-colors duration-500 ${
-                        isDarkMode ? "text-gray-200" : "text-gray-900"
-                      }`}
+                      className={`font-medium text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-200" : "text-gray-900"
+                        }`}
                     >
                       {userInfo.phone || "N/A"}
                     </p>
@@ -507,11 +496,10 @@ const AdminProfile = () => {
             {/* Account Information */}
             <div className="space-y-6">
               <h3
-                className={`text-2xl font-bold border-b pb-2 transition-colors duration-500 ${
-                  isDarkMode
+                className={`text-2xl font-bold border-b pb-2 transition-colors duration-500 ${isDarkMode
                     ? "text-gray-100 border-gray-600"
                     : "text-gray-900 border-gray-200"
-                }`}
+                  }`}
               >
                 Account Information
               </h3>
@@ -519,22 +507,19 @@ const AdminProfile = () => {
               {/* Role */}
               <div className="flex items-center space-x-3">
                 <Shield
-                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-400"
-                  }`}
+                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${isDarkMode ? "text-gray-400" : "text-gray-400"
+                    }`}
                 />
                 <div className="flex-1">
                   <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
+                    className={`text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
                   >
                     Role
                   </label>
                   <p
-                    className={`font-medium text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-200" : "text-gray-900"
-                    }`}
+                    className={`font-medium text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-200" : "text-gray-900"
+                      }`}
                   >
                     {userInfo.role}
                   </p>
@@ -545,23 +530,20 @@ const AdminProfile = () => {
               <div className="flex items-center space-x-3">
                 <div className="w-6 h-6 mr-6 flex items-center justify-center">
                   <div
-                    className={`w-3 h-3 rounded-full ${
-                      userInfo.accountVerified ? "bg-green-500" : "bg-red-500"
-                    }`}
+                    className={`w-3 h-3 rounded-full ${userInfo.accountVerified ? "bg-green-500" : "bg-red-500"
+                      }`}
                   ></div>
                 </div>
                 <div className="flex-1">
                   <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
+                    className={`text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
                   >
                     Account Status
                   </label>
                   <p
-                    className={`font-medium text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-200" : "text-gray-900"
-                    }`}
+                    className={`font-medium text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-200" : "text-gray-900"
+                      }`}
                   >
                     {userInfo.accountVerified ? "Verified" : "Unverified"}
                   </p>
@@ -571,22 +553,19 @@ const AdminProfile = () => {
               {/* Account Created */}
               <div className="flex items-center space-x-3">
                 <Clock
-                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-400"
-                  }`}
+                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${isDarkMode ? "text-gray-400" : "text-gray-400"
+                    }`}
                 />
                 <div className="flex-1">
                   <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
+                    className={`text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
                   >
                     Member Since
                   </label>
                   <p
-                    className={`font-medium text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-200" : "text-gray-900"
-                    }`}
+                    className={`font-medium text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-200" : "text-gray-900"
+                      }`}
                   >
                     {formatDateTime(userInfo.createdAt)}
                   </p>
@@ -600,53 +579,69 @@ const AdminProfile = () => {
       {/* Quick Stats Card */}
       <div className="mt-8">
         <div
-          className={`rounded-lg shadow-lg p-6 transition-colors duration-500 ${
-            isDarkMode ? "bg-gray-800" : "bg-white"
-          }`}
+          className={`rounded-lg border border-gray-50 p-6 transition-colors duration-500 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white"
+            }`}
         >
           <h3
-            className={`text-2xl font-bold mb-4 transition-colors duration-500 ${
-              isDarkMode ? "text-gray-100" : "text-gray-900"
-            }`}
+            className={`text-2xl font-bold mb-4 transition-colors duration-500 ${isDarkMode ? "text-gray-100" : "text-gray-900"
+              }`}
           >
             Quick Stats
           </h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span
-                className={`text-xl transition-colors duration-500 ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
+
+          {/* Carded metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Total Users */}
+            <div
+              className={`rounded-xl shadow-lg p-6 border transition-colors duration-500 ${isDarkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-100"
                 }`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-green-500 p-3 rounded-lg">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <h4
+                className={`text-2xl font-bold mb-1 transition-colors duration-500 ${isDarkMode ? "text-gray-100" : "text-gray-900"
+                  }`}
+              >
+                {Number(stats.totalUsers || 0).toLocaleString()}
+              </h4>
+              <p
+                className={`text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
               >
                 Total Users
-              </span>
-              <span
-                className={`text-xl font-bold transition-colors duration-500 ${
-                  isDarkMode ? "text-gray-200" : "text-gray-900"
-                }`}
-              >
-                {stats.totalUsers}
-              </span>
+              </p>
             </div>
-            <div className="flex items-center justify-between">
-              <span
-                className={`text-xl transition-colors duration-500 ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
+
+            {/* Total Events */}
+            <div
+              className={`rounded-xl shadow-lg p-6 border transition-colors duration-500 ${isDarkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-100"
                 }`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-blue-500 p-3 rounded-lg">
+                  <Calendar className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <h4
+                className={`text-2xl font-bold mb-1 transition-colors duration-500 ${isDarkMode ? "text-gray-100" : "text-gray-900"
+                  }`}
+              >
+                {Number(stats.totalEvents || 0).toLocaleString()}
+              </h4>
+              <p
+                className={`text-lg transition-colors duration-500 ${isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}
               >
                 Total Events
-              </span>
-              <span
-                className={`text-xl font-bold transition-colors duration-500 ${
-                  isDarkMode ? "text-gray-200" : "text-gray-900"
-                }`}
-              >
-                {stats.totalEvents}
-              </span>
+              </p>
             </div>
           </div>
         </div>
       </div>
+
     </div>
   );
 };

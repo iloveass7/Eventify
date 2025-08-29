@@ -1,4 +1,4 @@
-// UpcomingEvents.jsx - Fixed Authentication Issues
+// UpcomingEvents.jsx - Fixed Authentication Issues + Admin guard + no zoom hovers
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -21,7 +21,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
   const [registering, setRegistering] = useState({});
   const navigate = useNavigate();
 
-  // Helper function to normalize tags
+  // Helpers
   const parseJSONSafe = (str) => {
     try {
       return JSON.parse(str);
@@ -44,13 +44,11 @@ const UpcomingEvents = ({ isDarkMode }) => {
     let s = String(raw).trim();
     s = s.replace(/^#/, "");
 
-    // Looks like an array: ["tag","tag2"]
     if (/^\s*\[.*\]\s*$/.test(s)) {
       const arr = parseJSONSafe(s);
       return Array.isArray(arr) ? arr.map(cleanOne).filter(Boolean) : [];
     }
 
-    // Fallback split on commas & whitespace
     return s
       .split(/[,\s]+/)
       .map(cleanOne)
@@ -61,7 +59,6 @@ const UpcomingEvents = ({ isDarkMode }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch user data using cookies (consistent with login approach)
         const userRes = await fetch(`${API_BASE}/api/user/me`, {
           credentials: "include",
         });
@@ -73,7 +70,6 @@ const UpcomingEvents = ({ isDarkMode }) => {
           }
         }
 
-        // Fetch upcoming events
         const eventsRes = await fetch(`${API_BASE}/api/event/upcoming`);
         const eventsData = await eventsRes.json();
 
@@ -81,7 +77,6 @@ const UpcomingEvents = ({ isDarkMode }) => {
           setEvents(eventsData.events);
         } else {
           setError("Failed to load events");
-          // Fallback to sample data
           setEvents([
             {
               _id: 1,
@@ -95,7 +90,6 @@ const UpcomingEvents = ({ isDarkMode }) => {
               endTime: "2025-09-16T02:00:00.000Z",
               venue: "Club Neon, Downtown",
               attendees: [],
-              maxAttendees: 500,
               organizer: { name: "Night Events Co." },
             },
           ]);
@@ -111,48 +105,36 @@ const UpcomingEvents = ({ isDarkMode }) => {
     fetchData();
   }, []);
 
-  // Automatic sliding effect
+  // Auto slide
   useEffect(() => {
     if (events.length === 0) return;
-
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev === events.length - 1 ? 0 : prev + 1));
     }, 4000);
-
     return () => clearInterval(interval);
   }, [events]);
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
     });
-  };
 
-  const formatTime = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("en-US", {
+  const formatTime = (dateString) =>
+    new Date(dateString).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
 
-  const getAttendancePercentage = (attendees, maxAttendees) => {
-    if (!maxAttendees || maxAttendees === 0) return 0;
-    return (attendees.length / maxAttendees) * 100;
-  };
-
-  const isUserRegistered = (event) => {
-    return (
-      currentUser &&
-      event.attendees.some(
-        (attendee) =>
-          attendee._id === currentUser._id || attendee === currentUser._id
-      )
+  const isUserRegistered = (event) =>
+    currentUser &&
+    event.attendees.some(
+      (attendee) =>
+        attendee?._id === currentUser._id || attendee === currentUser._id
     );
-  };
+
+  const isAdmin = currentUser?.role === "Admin";
 
   const handleRegister = async (eventId) => {
     if (!currentUser) {
@@ -160,44 +142,37 @@ const UpcomingEvents = ({ isDarkMode }) => {
       return;
     }
 
+    // Admins cannot register
+    if (isAdmin) {
+      // soft notify; you can replace with your notifier
+      alert("Admins can’t register for events.");
+      return;
+    }
+
     setRegistering((prev) => ({ ...prev, [eventId]: true }));
 
     try {
-      // Try multiple authentication methods
       const token = localStorage.getItem("token");
-      
-      // Prepare headers - try both cookie and token authentication
-      const headers = {
-        "Content-Type": "application/json",
-      };
-      
-      // Add Authorization header only if token exists
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
 
-      const res = await fetch(
-        `${API_BASE}/api/event/${eventId}/register`,
-        {
-          method: "POST",
-          headers: headers,
-          credentials: "include", // This ensures cookies are sent
-        }
-      );
+      const res = await fetch(`${API_BASE}/api/event/${eventId}/register`, {
+        method: "POST",
+        headers,
+        credentials: "include",
+      });
 
       const data = await res.json();
 
       if (data.success) {
-        // Update the event to show user is registered
         setEvents((prev) =>
-          prev.map((event) =>
-            event._id === eventId
-              ? { ...event, attendees: [...event.attendees, currentUser._id] }
-              : event
+          prev.map((ev) =>
+            ev._id === eventId
+              ? { ...ev, attendees: [...ev.attendees, currentUser._id] }
+              : ev
           )
         );
       } else {
-        // Handle specific authentication errors
         if (res.status === 401 || res.status === 403) {
           alert("Please log in again to register for events");
           navigate("/login");
@@ -293,7 +268,6 @@ const UpcomingEvents = ({ isDarkMode }) => {
           <p className="text-gray-600">No upcoming events found.</p>
         </div>
       ) : (
-        /* Horizontal Slider Container */
         <div
           className={`relative h-[600px] overflow-hidden rounded-2xl shadow-2xl transition-colors duration-500 ${
             isDarkMode
@@ -301,10 +275,10 @@ const UpcomingEvents = ({ isDarkMode }) => {
               : "bg-gradient-to-br from-purple-50 to-white"
           }`}
         >
-          {/* Navigation Arrows */}
+          {/* Navigation Arrows (no zoom on hover) */}
           <button
             onClick={prevSlide}
-            className={`absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${
+            className={`absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full shadow-lg transition-colors duration-300 ${
               isDarkMode
                 ? "bg-gray-700/90 hover:bg-gray-600 text-purple-400"
                 : "bg-white/90 hover:bg-white text-purple-600"
@@ -316,7 +290,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
 
           <button
             onClick={nextSlide}
-            className={`absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 ${
+            className={`absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full shadow-lg transition-colors duration-300 ${
               isDarkMode
                 ? "bg-gray-700/90 hover:bg-gray-600 text-purple-400"
                 : "bg-white/90 hover:bg-white text-purple-600"
@@ -326,7 +300,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
             <ChevronRight className="w-6 h-6" />
           </button>
 
-          {/* Slides Container */}
+          {/* Slides */}
           <div
             className="h-full flex transition-transform duration-700 ease-in-out"
             style={{ transform: `translateX(-${currentSlide * 100}%)` }}
@@ -335,7 +309,9 @@ const UpcomingEvents = ({ isDarkMode }) => {
               const registered = isUserRegistered(event);
               const registrationClosed =
                 new Date() > new Date(event.registrationDeadline);
-              const isFull = event.attendees.length >= event.maxAttendees;
+              const isFull =
+                typeof event.maxAttendees === "number" &&
+                event.attendees.length >= event.maxAttendees;
 
               return (
                 <div
@@ -344,7 +320,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
                     isDarkMode ? "bg-gray-800" : "bg-white"
                   }`}
                 >
-                  {/* Image with Overlay */}
+                  {/* Image */}
                   <div className="relative w-full md:w-2/5 h-48 md:h-full">
                     <img
                       src={
@@ -354,9 +330,8 @@ const UpcomingEvents = ({ isDarkMode }) => {
                       alt={event.name}
                       className="h-full w-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
 
-                    {/* Organizer Info */}
                     <div className="absolute bottom-4 right-4 text-white text-sm">
                       <span className="opacity-90">
                         by {event.organizer?.name || "Unknown"}
@@ -373,7 +348,6 @@ const UpcomingEvents = ({ isDarkMode }) => {
                     }`}
                   >
                     <div className="flex-1 overflow-hidden ">
-                      {/* Header */}
                       <div className="mb-4">
                         <h3
                           className={`text-3xl font-bold leading-tight transition-colors duration-500 ${
@@ -392,9 +366,8 @@ const UpcomingEvents = ({ isDarkMode }) => {
                         {event.description}
                       </p>
 
-                      {/* Event Details Grid */}
+                      {/* Details */}
                       <div className="grid grid-cols-1 text-lg sm:grid-cols-2 gap-4 mb-5">
-                        {/* Date & Time */}
                         <div
                           className={`flex items-center gap-3 p-3 rounded-xl shadow-sm transition-colors duration-500 ${
                             isDarkMode ? "bg-gray-700" : "bg-white"
@@ -443,7 +416,6 @@ const UpcomingEvents = ({ isDarkMode }) => {
                           </div>
                         </div>
 
-                        {/* Location */}
                         <div
                           className={`flex items-center gap-3 p-3 rounded-xl shadow-sm sm:col-span-2 transition-colors duration-500 ${
                             isDarkMode ? "bg-gray-700" : "bg-white"
@@ -469,7 +441,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
                         </div>
                       </div>
 
-                      {/* Attendees Section */}
+                      {/* Attendees */}
                       <div
                         className={`flex items-center gap-3 p-3 rounded-xl shadow-sm mb-5 transition-colors duration-500 ${
                           isDarkMode ? "bg-gray-700" : "bg-white"
@@ -522,9 +494,19 @@ const UpcomingEvents = ({ isDarkMode }) => {
                       </div>
                     </div>
 
-                    {/* Action Buttons - Fixed at bottom */}
+                    {/* Action (no zoom effects) */}
                     <div className="flex gap-4 mt-auto pt-4">
-                      {registered ? (
+                      {isAdmin ? (
+                        <div
+                          className={`flex-1 px-6 py-3 rounded-2xl text-center font-semibold border ${
+                            isDarkMode
+                              ? "bg-red-900/50 text-red-200 border-red-700"
+                              : "bg-red-100 text-red-700 border-red-200"
+                          }`}
+                        >
+                          Admins can’t register for events.
+                        </div>
+                      ) : registered ? (
                         <div className="flex items-center gap-3 bg-green-100 text-green-800 px-6 py-3 rounded-2xl flex-1 shadow-sm">
                           <CheckCircle className="w-5 h-5" />
                           <span className="font-semibold text-base">Registered</span>
@@ -537,7 +519,13 @@ const UpcomingEvents = ({ isDarkMode }) => {
                             isFull ||
                             registrationClosed
                           }
-                          className="bg-purple-600 text-white px-8 py-3 rounded-2xl hover:bg-purple-700 transition-all duration-300 text-lg font-semibold flex-1 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                          className={`px-8 py-3 rounded-2xl text-white text-lg font-semibold flex-1 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isFull || registrationClosed
+                              ? isDarkMode
+                                ? "bg-gray-700"
+                                : "bg-gray-400"
+                              : "bg-purple-600 hover:bg-purple-700"
+                          }`}
                         >
                           {registering[event._id]
                             ? "Processing..."

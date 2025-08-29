@@ -4,36 +4,25 @@ import {
   User,
   Mail,
   Phone,
-  CreditCard,
-  Calendar,
   Edit3,
   Save,
   X,
   Camera,
-  Eye,
-  EyeOff,
-  Award,
   Clock,
-  MapPin,
+  Calendar,
+  Award,
 } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
 
 const UserProfile = () => {
   const { isDarkMode } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
-  const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const [userInfo, setUserInfo] = useState(null); // Dynamic user data
   const [editForm, setEditForm] = useState({});
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
+  const [counts, setCounts] = useState({ registered: 0, attended: 0 });
+  const [countsLoading, setCountsLoading] = useState(true);
 
   // Create a ref for the file input
   const fileInputRef = useRef(null);
@@ -44,21 +33,42 @@ const UserProfile = () => {
       try {
         const response = await fetch(`${API_BASE}/api/user/me`, {
           method: "GET",
-          credentials: "include", // include credentials for authentication
+          credentials: "include",
         });
         const data = await response.json();
         if (response.ok) {
-          setUserInfo(data.user); // Set user data from the backend
-          setEditForm(data.user); // Pre-fill edit form with user data
+          setUserInfo(data.user);
+          setEditForm(data.user);
         } else {
           alert("Failed to fetch user data");
         }
-      } catch (err) {
+      } catch {
         alert("Error fetching user data");
       }
     };
 
+    // Fetch counts (registered + attended)
+    const fetchCounts = async () => {
+      try {
+        const [regRes, attRes] = await Promise.all([
+          fetch(`${API_BASE}/api/user/me/registered-events`, { credentials: "include" }),
+          fetch(`${API_BASE}/api/user/me/attended-events`, { credentials: "include" }),
+        ]);
+        const regData = await regRes.json().catch(() => ({ events: [] }));
+        const attData = await attRes.json().catch(() => ({ events: [] }));
+        setCounts({
+          registered: Array.isArray(regData?.events) ? regData.events.length : 0,
+          attended: Array.isArray(attData?.events) ? attData.events.length : 0,
+        });
+      } catch {
+        setCounts({ registered: 0, attended: 0 });
+      } finally {
+        setCountsLoading(false);
+      }
+    };
+
     fetchUserData();
+    fetchCounts();
   }, []);
 
   // Handle input changes for profile edit form
@@ -71,38 +81,28 @@ const UserProfile = () => {
   };
 
   const handleEdit = () => {
-    // Enable editing and copy current user data to the edit form
     setIsEditing(true);
-    setEditForm({ ...userInfo }); // Make a copy of userInfo and use it in the edit form
+    setEditForm({ ...userInfo });
   };
 
   // Handle profile picture upload
-  const handleProfilePictureClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
+  const handleProfilePictureClick = () => fileInputRef.current?.click();
 
   const handleProfilePictureChange = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
     if (!allowedTypes.includes(file.type)) {
       alert("Please select a valid image file (JPEG, PNG, or GIF)");
       return;
     }
-
-    // Validate file size (5MB limit)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
+    if (file.size > 5 * 1024 * 1024) {
       alert("File size must be less than 5MB");
       return;
     }
 
     setIsUploadingImage(true);
-
     try {
       const token = localStorage.getItem("auth_token");
       const formData = new FormData();
@@ -110,9 +110,7 @@ const UserProfile = () => {
 
       const response = await fetch(`${API_BASE}/api/user/me/update/picture`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
         credentials: "include",
       });
@@ -120,187 +118,73 @@ const UserProfile = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Update both userInfo and editForm with new profile picture
-        const updatedUser = {
-          ...userInfo,
-          profilePicture: data.profilePictureUrl,
-        };
+        const updatedUser = { ...userInfo, profilePicture: data.profilePictureUrl };
         setUserInfo(updatedUser);
         setEditForm(updatedUser);
-        // alert("Profile picture updated successfully!");
       } else {
         alert(data.message || "Error updating profile picture");
       }
-    } catch (err) {
+    } catch {
       alert("Error uploading profile picture");
     } finally {
       setIsUploadingImage(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   // Handle profile update
   const handleSave = async () => {
     try {
-      const token = localStorage.getItem("auth_token"); // Get the token from localStorage
-
-      // Create a clean object with only the fields that should be updated
+      const token = localStorage.getItem("auth_token");
       const updateData = {
         name: editForm.name,
         phone: editForm.phone,
         universityId: editForm.universityId,
-        // Don't include password unless it's being explicitly changed
       };
 
       const response = await fetch(`${API_BASE}/api/user/me/update`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // Send token in the Authorization header
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(updateData), // Send only the necessary data
-        credentials: "include", // Include cookies for authentication (if needed)
+        body: JSON.stringify(updateData),
+        credentials: "include",
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setUserInfo(data.user); // Update with the response data from backend
+        setUserInfo(data.user);
         setIsEditing(false);
         alert("Profile updated successfully!");
       } else {
         alert(data.message || "Error updating profile");
       }
-    } catch (err) {
+    } catch {
       alert("Error saving profile");
     }
   };
 
-  // Handle cancel edit
   const handleCancel = () => {
     setIsEditing(false);
-    setEditForm(userInfo); // Reset to initial user data
-    setShowPasswordChange(false);
-    setPasswordForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-  };
-
-  // Handle password change
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  // Handle saving password using reset token flow
-  const handlePasswordSave = async () => {
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert("New passwords do not match!");
-      return;
-    }
-    if (passwordForm.newPassword.length < 8) {
-      alert("Password must be at least 8 characters long!");
-      return;
-    }
-    if (passwordForm.newPassword.length > 32) {
-      alert("Password cannot be more than 32 characters long!");
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem("auth_token");
-
-      // Step 1: Generate internal reset token
-      const resetTokenResponse = await fetch(
-        `${API_BASE}/api/user/generate-reset-token`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            currentPassword: passwordForm.currentPassword,
-          }),
-          credentials: "include",
-        }
-      );
-
-      const resetData = await resetTokenResponse.json();
-
-      if (!resetTokenResponse.ok) {
-        alert(resetData.message || "Current password is incorrect!");
-        return;
-      }
-
-      // Step 2: Use the reset token to change password
-      const resetResponse = await fetch(
-        `${API_BASE}/api/user/password/reset/${resetData.resetToken}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            password: passwordForm.newPassword,
-            confirmPassword: passwordForm.confirmPassword,
-          }),
-          credentials: "include",
-        }
-      );
-
-      const data = await resetResponse.json();
-
-      if (resetResponse.ok) {
-        alert("Password changed successfully!");
-        setShowPasswordChange(false);
-        setPasswordForm({
-          currentPassword: "",
-          newPassword: "",
-          confirmPassword: "",
-        });
-      } else {
-        alert(data.message || "Error changing password");
-      }
-    } catch (err) {
-      alert("Error changing password");
-    }
-  };
-
-  // Format date for display
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    setEditForm(userInfo);
   };
 
   // Format date-time for display
-  const formatDateTime = (dateString) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDateTime = (dateString) =>
+    new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
 
-  if (!userInfo) {
-    return <div>Loading...</div>;
-  }
+  if (!userInfo) return <div>Loading...</div>;
 
   return (
-    <div className="max-w-8xl mx-2 py-10">
+    <div className="max-w-8xl mx-6 py-10">
       {/* Hidden file input for profile picture */}
       <input
         type="file"
@@ -333,7 +217,7 @@ const UserProfile = () => {
                     className="absolute bottom-0 right-0 bg-purple-600 text-white p-2 rounded-full shadow-lg hover:bg-purple-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isUploadingImage ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <Camera className="w-4 h-4" />
                     )}
@@ -345,9 +229,7 @@ const UserProfile = () => {
                 <div className="flex items-center space-x-4 mt-2">
                   <div className="flex items-center space-x-2">
                     <User className="w-5 h-5 text-blue-200" />
-                    <span className="text-lg text-blue-100">
-                      {userInfo.role}
-                    </span>
+                    <span className="text-lg text-blue-100">{userInfo.role}</span>
                   </div>
                 </div>
               </div>
@@ -391,9 +273,7 @@ const UserProfile = () => {
             <div className="space-y-6">
               <h3
                 className={`text-2xl font-bold border-b pb-2 transition-colors duration-500 ${
-                  isDarkMode
-                    ? "text-gray-100 border-gray-600"
-                    : "text-gray-900 border-gray-200"
+                  isDarkMode ? "text-gray-100 border-gray-600" : "text-gray-900 border-gray-200"
                 }`}
               >
                 Personal Information
@@ -401,17 +281,9 @@ const UserProfile = () => {
 
               {/* Name */}
               <div className="flex items-center space-x-3">
-                <User
-                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-400"
-                  }`}
-                />
+                <User className={`w-6 h-6 mr-6 ${isDarkMode ? "text-gray-400" : "text-gray-400"}`} />
                 <div className="flex-1">
-                  <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
+                  <label className={`text-lg ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                     Full Name
                   </label>
                   {isEditing ? (
@@ -420,18 +292,14 @@ const UserProfile = () => {
                       name="name"
                       value={editForm.name}
                       onChange={handleInputChange}
-                      className={`w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-500 ${
+                      className={`w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                         isDarkMode
                           ? "bg-gray-700 border-gray-600 text-gray-100"
                           : "bg-white border-gray-300 text-gray-900"
                       }`}
                     />
                   ) : (
-                    <p
-                      className={`font-medium text-lg transition-colors duration-500 ${
-                        isDarkMode ? "text-gray-200" : "text-gray-900"
-                      }`}
-                    >
+                    <p className={`font-medium text-lg ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
                       {userInfo.name}
                     </p>
                   )}
@@ -440,24 +308,12 @@ const UserProfile = () => {
 
               {/* Email */}
               <div className="flex items-center space-x-3">
-                <Mail
-                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-400"
-                  }`}
-                />
+                <Mail className={`w-6 h-6 mr-6 ${isDarkMode ? "text-gray-400" : "text-gray-400"}`} />
                 <div className="flex-1">
-                  <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
+                  <label className={`text-lg ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                     Email Address
                   </label>
-                  <p
-                    className={`font-medium text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
+                  <p className={`font-medium text-lg ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
                     {userInfo.email}
                   </p>
                 </div>
@@ -465,37 +321,23 @@ const UserProfile = () => {
 
               {/* Phone */}
               <div className="flex items-center space-x-3">
-                <Phone
-                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-400"
-                  }`}
-                />
+                <Phone className={`w-6 h-6 mr-6 ${isDarkMode ? "text-gray-400" : "text-gray-400"}`} />
                 <div className="flex-1">
-                  <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
-                    Phone
-                  </label>
+                  <label className={`text-lg ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>Phone</label>
                   {isEditing ? (
                     <input
                       type="text"
                       name="phone"
                       value={editForm.phone || ""}
                       onChange={handleInputChange}
-                      className={`w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-500 ${
+                      className={`w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                         isDarkMode
                           ? "bg-gray-700 border-gray-600 text-gray-100"
                           : "bg-white border-gray-300 text-gray-900"
                       }`}
                     />
                   ) : (
-                    <p
-                      className={`font-medium text-lg transition-colors duration-500 ${
-                        isDarkMode ? "text-gray-200" : "text-gray-900"
-                      }`}
-                    >
+                    <p className={`font-medium text-lg ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
                       {userInfo.phone || "N/A"}
                     </p>
                   )}
@@ -507,13 +349,12 @@ const UserProfile = () => {
             <div className="space-y-6">
               <h3
                 className={`text-2xl font-bold border-b pb-2 transition-colors duration-500 ${
-                  isDarkMode
-                    ? "text-gray-100 border-gray-600"
-                    : "text-gray-900 border-gray-200"
+                  isDarkMode ? "text-gray-100 border-gray-600" : "text-gray-900 border-gray-200"
                 }`}
               >
                 Academic Information
               </h3>
+
               {/* Account Status */}
               <div className="flex items-center space-x-3">
                 <div className="w-6 h-6 mr-6 flex items-center justify-center">
@@ -521,46 +362,26 @@ const UserProfile = () => {
                     className={`w-3 h-3 rounded-full ${
                       userInfo.accountVerified ? "bg-green-500" : "bg-red-500"
                     }`}
-                  ></div>
+                  />
                 </div>
                 <div className="flex-1">
-                  <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
+                  <label className={`text-lg ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                     Account Status
                   </label>
-                  <p
-                    className={`font-medium text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
+                  <p className={`font-medium text-lg ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
                     {userInfo.accountVerified ? "Verified" : "Unverified"}
                   </p>
                 </div>
               </div>
 
-              {/* Account Created */}
+              {/* Member Since */}
               <div className="flex items-center space-x-3">
-                <Clock
-                  className={`w-6 h-6 mr-6 transition-colors duration-500 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-400"
-                  }`}
-                />
+                <Clock className={`w-6 h-6 mr-6 ${isDarkMode ? "text-gray-400" : "text-gray-400"}`} />
                 <div className="flex-1">
-                  <label
-                    className={`text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
+                  <label className={`text-lg ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                     Member Since
                   </label>
-                  <p
-                    className={`font-medium text-lg transition-colors duration-500 ${
-                      isDarkMode ? "text-gray-200" : "text-gray-900"
-                    }`}
-                  >
+                  <p className={`font-medium text-lg ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
                     {formatDateTime(userInfo.createdAt)}
                   </p>
                 </div>
@@ -568,7 +389,66 @@ const UserProfile = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div> {/* /Main Profile Card */}
+
+      {/* Activity Overview (new) */}
+      <div className="mt-8">
+        <h3
+          className={`text-2xl font-bold mb-4 ${
+            isDarkMode ? "text-gray-100" : "text-gray-900"
+          }`}
+        >
+          Activity Overview
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Registered (My Events) */}
+          <div
+            className={`rounded-xl border shadow p-6 flex items-center justify-between transition-all duration-300 ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700 hover:border-gray-600 hover:ring-1 hover:ring-purple-400/20"
+                : "bg-white border-gray-200 hover:border-gray-300 hover:ring-1 hover:ring-purple-500/10"
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-lg bg-purple-600/90 text-white">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                  My Events
+                </div>
+                <div className={`text-3xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
+                  {countsLoading ? "—" : counts.registered}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Attended */}
+          <div
+            className={`rounded-xl border shadow p-6 flex items-center justify-between transition-all duration-300 ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700 hover:border-gray-600 hover:ring-1 hover:ring-purple-400/20"
+                : "bg-white border-gray-200 hover:border-gray-300 hover:ring-1 hover:ring-purple-500/10"
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-lg bg-green-600 text-white">
+                <Award className="w-6 h-6" />
+              </div>
+              <div>
+                <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                  Attended Events
+                </div>
+                <div className={`text-3xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
+                  {countsLoading ? "—" : counts.attended}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div> {/* /Activity Overview */}
     </div>
   );
 };
