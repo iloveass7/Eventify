@@ -11,7 +11,8 @@ const normalizeTags = (raw) => {
       .replace(/^#/, "")
       .replace(/^\[|\]$/g, "")
       .replace(/^"|"$/g, "")
-      .trim();
+      .trim()
+      .toLowerCase();
   if (Array.isArray(raw)) return raw.flatMap((item) => normalizeTags(item));
   let s = String(raw).trim();
   if (/^\s*\[.*\]\s*$/.test(s) || /^\s*".*"\s*$/.test(s)) {
@@ -19,13 +20,19 @@ const normalizeTags = (raw) => {
       const parsed = JSON.parse(s);
       if (Array.isArray(parsed)) return parsed.flatMap((x) => normalizeTags(x));
       return [clean(parsed)];
-    } catch {}
+    } catch { }
   }
   return s
     .split(/[,\s]+/)
     .map(clean)
     .filter(Boolean);
 };
+
+const toTitle = (s) =>
+  String(s || "")
+    .split(" ")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
+    .join(" ");
 
 const toTs = (d) => {
   const t = new Date(d).getTime();
@@ -72,7 +79,7 @@ const ManageEvents = () => {
     startTime: "",
     endTime: "",
     venue: "",
-    tags: "",
+    tags: "", // single tag string (lowercase)
   });
 
   const [loading, setLoading] = useState(true);
@@ -148,6 +155,32 @@ const ManageEvents = () => {
   // reset "Show more" when switching tabs
   useEffect(() => setShowAll(false), [tab]);
 
+  /* ---------- dynamic TAG options (fix #1 & #2) ---------- */
+  const PRESET_TAGS = useMemo(
+    () => [
+      "conference",
+      "workshop",
+      "seminar",
+      "networking",
+      "concert",
+      "festival",
+      "sports",
+      "exhibition",
+      "other",
+    ],
+    []
+  );
+
+  const allTags = useMemo(() => {
+    const s = new Set(PRESET_TAGS);
+    [...eventsAll, ...eventsUpcoming].forEach((ev) => {
+      normalizeTags(ev?.tags).forEach((t) => s.add(t));
+    });
+    // ensure currently selected tag is present (for events with rare/custom tags)
+    if (formData.tags) s.add(formData.tags.toLowerCase());
+    return Array.from(s).sort();
+  }, [eventsAll, eventsUpcoming, PRESET_TAGS, formData.tags]);
+
   /* ---------- edit & delete ---------- */
   const toLocalISOString = (date) => {
     if (!date) return "";
@@ -166,6 +199,7 @@ const ManageEvents = () => {
       setUploadError("");
       return;
     }
+    const tags = normalizeTags(event.tags);
     setEditingEvent(event._id);
     setFormData({
       name: event.name || "",
@@ -173,7 +207,8 @@ const ManageEvents = () => {
       startTime: toLocalISOString(event.startTime),
       endTime: toLocalISOString(event.endTime),
       venue: event.venue || "",
-      tags: normalizeTags(event.tags)[0] || "",
+      // keep lowercase so it matches option values
+      tags: tags[0] || "",
     });
     setUploadFiles([]);
     setUploadError("");
@@ -210,7 +245,15 @@ const ManageEvents = () => {
     setError("");
     try {
       const token = getAuthToken();
-      const updateData = { ...formData, tags: [formData.tags] };
+
+      // if empty, send empty array; otherwise single tag array
+      const tagsPayload =
+        formData.tags && String(formData.tags).trim()
+          ? [String(formData.tags).trim().toLowerCase()]
+          : [];
+
+      const updateData = { ...formData, tags: tagsPayload };
+
       const res = await fetch(`${API_BASE}/api/event/${id}`, {
         method: "PUT",
         credentials: "include",
@@ -224,7 +267,7 @@ const ManageEvents = () => {
       if (!res.ok)
         throw new Error(
           data?.message ||
-            "Failed to update event. You may not have permission to edit this event."
+          "Failed to update event. You may not have permission to edit this event."
         );
       await loadLists();
       setEditingEvent(null);
@@ -369,10 +412,10 @@ const ManageEvents = () => {
     !dateString
       ? "Date TBA"
       : new Date(dateString).toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
 
   /* ---------- derive list like AllEvents ---------- */
   const now = Date.now();
@@ -397,9 +440,8 @@ const ManageEvents = () => {
   if (loading) {
     return (
       <div
-        className={`flex justify-center items-center min-h-screen ${
-          isDarkMode ? "bg-gray-800 text-gray-300" : "bg-white text-gray-700"
-        }`}
+        className={`flex justify-center items-center min-h-screen ${isDarkMode ? "bg-gray-800 text-gray-300" : "bg-white text-gray-700"
+          }`}
       >
         Loading events...
       </div>
@@ -408,25 +450,22 @@ const ManageEvents = () => {
 
   return (
     <div
-      className={`transition-colors duration-500 ${
-        isDarkMode ? "bg-gray-800 text-gray-100" : "bg-white text-gray-900"
-      }`}
+      className={`transition-colors duration-500 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-white text-gray-900"
+        }`}
     >
       <div className="mx-1 max-w-screen-3xl px-4 sm:px-6 py-8">
         {error && (
           <div
-            className={`${
-              isDarkMode
+            className={`${isDarkMode
                 ? "bg-red-900/40 border border-red-700 text-red-200"
                 : "bg-red-50 border border-red-300 text-red-700"
-            } px-4 py-3 rounded mb-6`}
+              } px-4 py-3 rounded mb-6`}
           >
             {error}
             <button
               onClick={() => setError("")}
-              className={`${
-                isDarkMode ? "text-red-300 hover:text-red-200" : "text-red-800 hover:text-red-900"
-              } float-right font-bold`}
+              className={`${isDarkMode ? "text-red-300 hover:text-red-200" : "text-red-800 hover:text-red-900"
+                } float-right font-bold`}
             >
               ×
             </button>
@@ -443,13 +482,12 @@ const ManageEvents = () => {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-6 py-2 rounded-lg border text-lg font-semibold transition-colors ${
-                tab === t.key
+              className={`px-6 py-2 rounded-lg border text-lg font-semibold transition-colors ${tab === t.key
                   ? "bg-purple-700 text-white border-purple-700"
                   : isDarkMode
-                  ? "bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700"
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-              }`}
+                    ? "bg-gray-800 text-gray-200 border-gray-700 hover:bg-gray-700"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                }`}
             >
               {t.label}
             </button>
@@ -467,7 +505,7 @@ const ManageEvents = () => {
         ) : (
           <div className="space-y-8">
             {eventsToShow.map((event) => {
-              const tags = normalizeTags(event.tags);
+              const tags = normalizeTags(event.tags); // all lower-case
               const primaryTag = tags[0];
               const ended = isEventEnded(event);
               const g = gallery[event._id] || {
@@ -483,11 +521,10 @@ const ManageEvents = () => {
               return (
                 <div
                   key={event._id}
-                  className={`w-full rounded-2xl overflow-hidden border shadow-sm transition-all duration-300 ${
-                    isDarkMode
+                  className={`w-full rounded-2xl overflow-hidden border shadow-sm transition-all duration-300 ${isDarkMode
                       ? "bg-gray-800 border-gray-600 hover:border-gray-500 hover:shadow-lg hover:ring-1 hover:ring-purple-400/20 hover:-translate-y-0.5"
                       : "bg-white border-gray-200 hover:border-gray-300 hover:shadow-lg hover:ring-1 hover:ring-purple-500/10 hover:-translate-y-0.5"
-                  }`}
+                    }`}
                 >
                   {/* Top content */}
                   <div className="p-6">
@@ -508,21 +545,19 @@ const ManageEvents = () => {
                       <div className="flex-1">
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                           <h3
-                            className={`text-2xl md:text-3xl font-bold break-words ${
-                              isDarkMode ? "text-purple-300" : "text-purple-800"
-                            }`}
+                            className={`text-2xl md:text-3xl font-bold break-words ${isDarkMode ? "text-purple-300" : "text-purple-800"
+                              }`}
                           >
                             {event.name}
                           </h3>
                           {primaryTag && (
                             <span
-                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                isDarkMode
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${isDarkMode
                                   ? "bg-purple-900/40 text-purple-200"
                                   : "bg-purple-100 text-purple-800"
-                              }`}
+                                }`}
                             >
-                              {primaryTag}
+                              {toTitle(primaryTag)}
                             </span>
                           )}
                         </div>
@@ -559,7 +594,9 @@ const ManageEvents = () => {
                           </div>
                           <div className={`rounded-lg px-3 py-2 ${isDarkMode ? "bg-gray-900/20" : "bg-gray-50"}`}>
                             <div className="text-xs opacity-70">Category</div>
-                            <div className="font-semibold">{tags.length ? tags.join(", ") : "—"}</div>
+                            <div className="font-semibold">
+                              {tags.length ? tags.map(toTitle).join(", ") : "—"}
+                            </div>
                           </div>
                           <div className={`rounded-lg px-3 py-2 ${isDarkMode ? "bg-gray-900/20" : "bg-gray-50"}`}>
                             <div className="text-xs opacity-70">Attendees</div>
@@ -604,11 +641,10 @@ const ManageEvents = () => {
                               value={formData.name}
                               onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
                               required
-                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${
-                                isDarkMode
+                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${isDarkMode
                                   ? "bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-400 focus:ring-purple-400"
                                   : "bg-white border-gray-300 text-gray-800 placeholder-gray-400 focus:ring-purple-500"
-                              }`}
+                                }`}
                             />
                           </div>
 
@@ -621,11 +657,10 @@ const ManageEvents = () => {
                               value={formData.venue}
                               onChange={(e) => setFormData((p) => ({ ...p, venue: e.target.value }))}
                               required
-                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${
-                                isDarkMode
+                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${isDarkMode
                                   ? "bg-gray-800 border-gray-700 text-gray-100 focus:ring-purple-400"
                                   : "bg-white border-gray-300 text-gray-800 focus:ring-purple-500"
-                              }`}
+                                }`}
                             >
                               <option value="">Select a location</option>
                               {locations.map((loc) => (
@@ -646,11 +681,10 @@ const ManageEvents = () => {
                               value={formData.startTime}
                               onChange={(e) => setFormData((p) => ({ ...p, startTime: e.target.value }))}
                               required
-                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${
-                                isDarkMode
+                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${isDarkMode
                                   ? "bg-gray-800 border-gray-700 text-gray-100 focus:ring-purple-400"
                                   : "bg-white border-gray-300 text-gray-800 focus:ring-purple-500"
-                              }`}
+                                }`}
                             />
                           </div>
 
@@ -664,14 +698,14 @@ const ManageEvents = () => {
                               value={formData.endTime}
                               onChange={(e) => setFormData((p) => ({ ...p, endTime: e.target.value }))}
                               required
-                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${
-                                isDarkMode
+                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${isDarkMode
                                   ? "bg-gray-800 border-gray-700 text-gray-100 focus:ring-purple-400"
                                   : "bg-white border-gray-300 text-gray-800 focus:ring-purple-500"
-                              }`}
+                                }`}
                             />
                           </div>
 
+                          {/* ---- FIXED: dynamic categories, lowercase values ---- */}
                           <div>
                             <label className={`block font-semibold mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                               Category
@@ -679,20 +713,22 @@ const ManageEvents = () => {
                             <select
                               name="tags"
                               value={formData.tags}
-                              onChange={(e) => setFormData((p) => ({ ...p, tags: e.target.value }))}
+                              onChange={(e) =>
+                                setFormData((p) => ({ ...p, tags: e.target.value.toLowerCase() }))
+                              }
                               required
-                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${
-                                isDarkMode
+                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${isDarkMode
                                   ? "bg-gray-800 border-gray-700 text-gray-100 focus:ring-purple-400"
                                   : "bg-white border-gray-300 text-gray-800 focus:ring-purple-500"
-                              }`}
+                                }`}
                             >
-                              <option value="Conference">Conference</option>
-                              <option value="Workshop">Workshop</option>
-                              <option value="Seminar">Seminar</option>
-                              <option value="Networking">Networking</option>
-                              <option value="Other">Other</option>
+                              {allTags.map((tag) => (
+                                <option key={tag} value={tag}>
+                                  {toTitle(tag)}
+                                </option>
+                              ))}
                             </select>
+
                           </div>
 
                           <div className="md:col-span-2">
@@ -705,11 +741,10 @@ const ManageEvents = () => {
                               onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
                               rows="4"
                               required
-                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${
-                                isDarkMode
+                              className={`w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 ${isDarkMode
                                   ? "bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-400 focus:ring-purple-400"
                                   : "bg-white border-gray-300 text-gray-800 placeholder-gray-400 focus:ring-purple-500"
-                              }`}
+                                }`}
                             />
                           </div>
                         </div>
@@ -733,26 +768,23 @@ const ManageEvents = () => {
                           </h4>
                           {!ended && (
                             <span
-                              className={`text-xs px-2 py-1 rounded ${
-                                isDarkMode ? "bg-yellow-900/40 text-yellow-200" : "bg-yellow-100 text-yellow-800"
-                              }`}
+                              className={`text-xs px-2 py-1 rounded ${isDarkMode ? "bg-yellow-900/40 text-yellow-200" : "bg-yellow-100 text-yellow-800"
+                                }`}
                             >
                               Available after event ends
                             </span>
                           )}
                         </div>
 
-                        {/* Upload box with a real button for file picking */}
+                        {/* Upload box */}
                         <div
-                          className={`border-2 border-dashed rounded-xl p-4 sm:p-6 mb-5 ${
-                            isDarkMode ? "border-gray-700 bg-gray-800/50" : "border-gray-300 bg-white"
-                          } ${!ended ? "opacity-60 pointer-events-none" : ""}`}
+                          className={`border-2 border-dashed rounded-xl p-4 sm:p-6 mb-5 ${isDarkMode ? "border-gray-700 bg-gray-800/50" : "border-gray-300 bg-white"
+                            } ${!ended ? "opacity-60 pointer-events-none" : ""}`}
                         >
                           <p className={`${isDarkMode ? "text-gray-300" : "text-gray-700"} mb-3`}>
                             Select up to 20 images (≤ 5MB each).
                           </p>
 
-                          {/* Hide the native input; use a label as a button */}
                           <input
                             id={fileInputId}
                             type="file"
@@ -780,11 +812,10 @@ const ManageEvents = () => {
                               <button
                                 type="button"
                                 onClick={() => setUploadFiles([])}
-                                className={`text-sm px-3 py-1 rounded border ${
-                                  isDarkMode
+                                className={`text-sm px-3 py-1 rounded border ${isDarkMode
                                     ? "border-gray-600 text-gray-200 hover:bg-gray-700"
                                     : "border-gray-300 text-gray-800 hover:bg-gray-100"
-                                }`}
+                                  }`}
                               >
                                 Clear
                               </button>
@@ -796,9 +827,8 @@ const ManageEvents = () => {
                               {uploadFiles.map((f, i) => (
                                 <span
                                   key={i}
-                                  className={`text-xs px-2 py-1 rounded ${
-                                    isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-800"
-                                  }`}
+                                  className={`text-xs px-2 py-1 rounded ${isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-800"
+                                    }`}
                                 >
                                   {f.name}
                                 </span>
@@ -821,8 +851,8 @@ const ManageEvents = () => {
                               {uploadingEventId === event._id
                                 ? "Uploading…"
                                 : uploadFiles.length
-                                ? `Upload ${uploadFiles.length} photo${uploadFiles.length > 1 ? "s" : ""}`
-                                : "Upload"}
+                                  ? `Upload ${uploadFiles.length} photo${uploadFiles.length > 1 ? "s" : ""}`
+                                  : "Upload"}
                             </button>
                           </div>
                         </div>
@@ -833,8 +863,8 @@ const ManageEvents = () => {
                             {g.loading
                               ? "Loading gallery…"
                               : g.items?.length
-                              ? `${g.items.length} of ${g.total ?? g.items.length} shown`
-                              : "No photos yet"}
+                                ? `${g.items.length} of ${g.total ?? g.items.length} shown`
+                                : "No photos yet"}
                           </div>
                           <div className="flex gap-2">
                             <button
@@ -845,10 +875,6 @@ const ManageEvents = () => {
                             </button>
                           </div>
                         </div>
-
-                        {g.error && (
-                          <div className={`mb-4 text-sm ${isDarkMode ? "text-red-300" : "text-red-600"}`}>{g.error}</div>
-                        )}
 
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                           {(g.items || []).map((photo) => (
@@ -905,9 +931,8 @@ const ManageEvents = () => {
             ) : (
               <button
                 onClick={() => setShowAll(false)}
-                className={`px-8 py-3 rounded-lg font-semibold transition shadow-md hover:shadow-lg ${
-                  isDarkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-600 text-white hover:bg-gray-700"
-                }`}
+                className={`px-8 py-3 rounded-lg font-semibold transition shadow-md hover:shadow-lg ${isDarkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-600 text-white hover:bg-gray-700"
+                  }`}
               >
                 Show Less
               </button>

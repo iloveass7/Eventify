@@ -28,7 +28,20 @@ const eventSchema = new mongoose.Schema(
       required: [true, "Event venue is required"],
       enum: ["Auditorium","Red X","Badamtola","VC Seminar Room","Hawa Bhobon","TT Ground","Plaza"],
     },
-    tags: { type: [String], default: [] },
+    tags: {
+  type: [String],
+  default: [],
+  set: (arr) => {
+    if (!Array.isArray(arr)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const s of arr) {
+      const v = String(s || "").trim().toLowerCase();
+      if (v && !seen.has(v)) { seen.add(v); out.push(v); }
+    }
+    return out;
+  },
+},
     organizer: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     attendedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -39,5 +52,6 @@ const eventSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
+eventSchema.index({ startTime: 1 });
+eventSchema.index({ tags: 1, startTime: 1 });
 export default mongoose.model("Event", eventSchema);

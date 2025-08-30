@@ -6,8 +6,51 @@ import PDFDocument from "pdfkit";
 import { deleteFromCloudinary } from "../Utils/cloudinary.js";
 
 
-// No changes needed in viewAllEvents, createEvent, viewEvent
-// No changes needed in registerForEvent, unregisterFromEvent
+function normalizeTagsInput(raw) {
+  if (raw == null) return [];
+
+  let arr = [];
+
+  // If the form sent repeated keys: tags=a, tags=b -> Express gives an array
+  if (Array.isArray(raw)) {
+    arr = raw;
+  } else if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return [];
+    // If someone sent JSON like '["Conference","Workshop"]'
+    if (/^\[.*\]$/.test(s)) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed)) arr = parsed;
+        else arr = [s];
+      } catch {
+        // Fallback: treat as CSV/whitespace
+        arr = s.split(/[,\s]+/);
+      }
+    } else {
+      // Single value or CSV
+      arr = s.split(/[,\s]+/);
+    }
+  } else {
+    arr = [];
+  }
+
+  // normalize: remove leading '#', trim, lowercase, dedupe
+  const seen = new Set();
+  const out = [];
+  for (const x of arr) {
+    const v = String(x || "")
+      .replace(/^#/, "")
+      .trim()
+      .toLowerCase();
+    if (v && !seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+    }
+  }
+  return out;
+}
+
 
 export const viewAllEvents = catchAsyncError(async (req, res, next) => {
   const events = await Event.find().populate("organizer", "name email");
@@ -21,9 +64,10 @@ export const createEvent = catchAsyncError(async (req, res, next) => {
     startTime,
     endTime,
     venue,
-    tags,
+    // tags,  // <-- don't use the raw tags directly
     registrationDeadline,
   } = req.body;
+
   if (
     !name ||
     !description ||
@@ -34,6 +78,8 @@ export const createEvent = catchAsyncError(async (req, res, next) => {
   ) {
     return next(new ErrorHandler("Please provide all required fields.", 400));
   }
+
+  // venue-time conflict check
   const existingEvent = await Event.findOne({
     venue: venue,
     $or: [
@@ -50,6 +96,8 @@ export const createEvent = catchAsyncError(async (req, res, next) => {
       )
     );
   }
+
+  // optional image upload
   let imageUrl = null;
   if (req.file) {
     try {
@@ -59,19 +107,24 @@ export const createEvent = catchAsyncError(async (req, res, next) => {
       return next(new ErrorHandler("Image upload failed.", 500));
     }
   }
+
+  // normalize tags coming from form-data (string, csv, json, repeated fields)
+  const normalizedTags = normalizeTagsInput(req.body.tags);
+
   const eventData = {
     name,
     description,
     startTime,
     endTime,
     venue,
-    tags,
+    tags: normalizedTags,
     registrationDeadline,
     organizer: req.user._id,
   };
   if (imageUrl) {
     eventData.image = imageUrl;
   }
+
   const event = await Event.create(eventData);
   res
     .status(201)
@@ -90,18 +143,26 @@ export const viewEvent = catchAsyncError(async (req, res, next) => {
 
 // UPDATED: Allow all admins to edit events, not just the organizer
 export const editEvent = catchAsyncError(async (req, res, next) => {
+  // Make sure the event exists first
   let event = await Event.findById(req.params.id);
   if (!event) {
     return next(new ErrorHandler("Event not found.", 404));
   }
-  
-  // Since the route already has isAdmin middleware, we don't need to check organizer
-  // All admins can edit any event
-  event = await Event.findByIdAndUpdate(req.params.id, req.body, {
+
+  // Build an update object and normalize tags if present
+  const update = { ...req.body };
+  if (Object.prototype.hasOwnProperty.call(update, "tags")) {
+    update.tags = normalizeTagsInput(update.tags);
+  }
+
+  // (Optional: you could re-run venue/time conflict checks here if venue/times change)
+
+  event = await Event.findByIdAndUpdate(req.params.id, update, {
     new: true,
     runValidators: true,
     useFindAndModify: false,
   });
+
   res
     .status(200)
     .json({ success: true, message: "Event updated successfully.", event });
@@ -568,4 +629,64 @@ export const deleteEventPhoto = catchAsyncError(async (req, res, next) => {
   await event.save();
 
   res.status(200).json({ success: true, message: "Photo deleted." });
+});
+
+export const getRecommendedEvents = catchAsyncError(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select("preferences");
+  const prefs = (user?.preferences || []).map((s) => String(s).trim().toLowerCase());
+
+  const now = new Date();
+  const limit = Math.min(Number(req.query.limit || 12), 50);
+  const includeRegistered = req.query.includeRegistered === "1";
+
+  // If no preferences yet, fall back to trending upcoming
+  if (!prefs.length) {
+    const fallback = await Event.find({ startTime: { $gte: now } })
+      .sort({ "attendees.length": -1, startTime: 1 })
+      .limit(limit)
+      .populate("organizer", "name email");
+    return res.status(200).json({ success: true, count: fallback.length, events: fallback });
+  }
+
+  // Pull a candidate pool using the tags index
+  const candidates = await Event.find({
+    startTime: { $gte: now },
+    tags: { $in: prefs },
+  })
+    .limit(200) // small pool; we’ll rank below
+    .populate("organizer", "name email")
+    .lean();
+
+  // Optionally exclude events the user already registered for
+  const userId = String(req.user._id);
+  const list = includeRegistered
+    ? candidates
+    : candidates.filter((e) => !(e.attendees || []).some((id) => String(id) === userId));
+
+  // Score: preference overlap, time proximity, popularity
+  const prefSet = new Set(prefs);
+  const MS = 1000, H = 3600 * MS, D = 24 * H;
+
+  const scored = list.map((e) => {
+    const start = new Date(e.startTime).getTime();
+    const daysAway = Math.max(0, (start - now.getTime()) / D);
+
+    const overlap =
+      Array.isArray(e.tags) ? e.tags.reduce((n, t) => n + (prefSet.has(String(t)) ? 1 : 0), 0) : 0;
+
+    const popularity = Array.isArray(e.attendees) ? e.attendees.length : 0;
+
+    // Tunable weights
+    const score =
+      overlap * 100 +        // main driver
+      Math.max(0, 30 - daysAway * 3) +  // closer events get a small boost
+      Math.min(20, popularity); // small boost for “trending”
+
+    return { score, e };
+  });
+
+  scored.sort((a, b) => b.score - a.score || new Date(a.e.startTime) - new Date(b.e.startTime));
+  const events = scored.slice(0, limit).map((x) => x.e);
+
+  res.status(200).json({ success: true, count: events.length, events });
 });

@@ -65,7 +65,7 @@ const CreateEvents = () => {
       formData.append("startTime", `${date}T${startTime}:00.000Z`);
       formData.append("endTime", `${date}T${endTime}:00.000Z`);
       formData.append("venue", location);
-      formData.append("tags", JSON.stringify([category]));
+      formData.append("tags", category);
       formData.append(
         "registrationDeadline",
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()

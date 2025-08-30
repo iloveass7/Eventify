@@ -14,6 +14,7 @@ import {
   listEventGallery,
   uploadEventPhotos,
   deleteEventPhoto,
+  getRecommendedEvents
 } from "../Controller/eventController.js";
 import { isAuthenticated } from "../Middleware/auth.js";
 import { isAdmin } from "../Middleware/adminAuth.js";
@@ -61,4 +62,5 @@ router
   .route("/:id/gallery/:photoId")
   .delete(isAuthenticated, isAdmin, deleteEventPhoto);
 
+router.route("/recommended").get(isAuthenticated, getRecommendedEvents);
 export default router;

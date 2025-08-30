@@ -12,6 +12,48 @@ import { createHmac } from "node:crypto";
 
 const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
+function normalizePreferences(raw) {
+  if (raw == null) return [];
+
+  const clean = (s) =>
+    String(s)
+      .trim()
+      .replace(/^#/, "") // strip leading hash if someone sends #Workshop
+      .slice(0, 50);     // hard cap length
+
+  // Accept array directly
+  if (Array.isArray(raw)) {
+    return dedupeCaseInsensitive(
+      raw
+        .map(clean)
+        .filter(Boolean)
+    ).slice(0, 20);
+  }
+
+  // Accept JSON string (e.g., '["Workshop","Seminar"]')
+  const str = String(raw).trim();
+  if (/^\s*\[.*\]\s*$/.test(str)) {
+    try {
+      const arr = JSON.parse(str);
+      return normalizePreferences(arr);
+    } catch { /* fall through */ }
+  }
+
+  // Fallback: split by comma/whitespace
+  return dedupeCaseInsensitive(
+    str.split(/[,\s]+/).map(clean).filter(Boolean)
+  ).slice(0, 20);
+}
+
+function dedupeCaseInsensitive(list) {
+  const m = new Map();
+  for (const s of list) {
+    const key = s.toLowerCase();
+    if (!m.has(key)) m.set(key, s);
+  }
+  return Array.from(m.values());
+}
+
 export const register = catchAsyncError(async (req, res, next) => {
   const { name, email, phone, password, verificationMethod, role } = req.body;
 
@@ -626,4 +668,55 @@ export const getMyAttendedEvents = catchAsyncError(async (req, res, next) => {
     success: true,
     events,
   });
+});
+
+export const getMyPreferences = catchAsyncError(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select("preferences");
+  if (!user) return next(new ErrorHandler("User not found.", 404));
+  res.status(200).json({ success: true, preferences: user.preferences || [] });
+});
+
+// PUT /api/user/me/preferences  (replace entire list)
+export const putMyPreferences = catchAsyncError(async (req, res, next) => {
+  const prefs = normalizePreferences(req.body.preferences);
+  if (prefs.length > 20) {
+    return next(new ErrorHandler("Max 20 preferences allowed.", 400));
+  }
+  const user = await User.findByIdAndUpdate(
+    req.user.id,
+    { $set: { preferences: prefs } },
+    { new: true, runValidators: true }
+  ).select("preferences");
+  if (!user) return next(new ErrorHandler("User not found.", 404));
+  res.status(200).json({ success: true, preferences: user.preferences });
+});
+
+// PATCH /api/user/me/preferences  (merge: add/remove)
+export const patchMyPreferences = catchAsyncError(async (req, res, next) => {
+  const add = normalizePreferences(req.body.add);
+  const remove = normalizePreferences(req.body.remove);
+
+  const user = await User.findById(req.user.id).select("preferences");
+  if (!user) return next(new ErrorHandler("User not found.", 404));
+
+  // Build case-insensitive set from current
+  const map = new Map();
+  (user.preferences || []).forEach((p) => map.set(String(p).toLowerCase(), p));
+
+  // Add
+  for (const p of add) {
+    const key = p.toLowerCase();
+    if (!map.has(key)) map.set(key, p);
+  }
+
+  // Remove
+  for (const r of remove) {
+    map.delete(r.toLowerCase());
+  }
+
+  const updated = Array.from(map.values()).slice(0, 20);
+  user.preferences = updated;
+  await user.save();
+
+  res.status(200).json({ success: true, preferences: user.preferences });
 });

@@ -41,11 +41,33 @@ const userSchema = new mongoose.Schema(
       required: [true, "Please select a role"],
     },
 
+    // NEW: user preferences (free-form array of strings with guardrails)
+    preferences: {
+      type: [String],
+      default: [],
+      validate: {
+        validator(arr) {
+          if (!Array.isArray(arr)) return false;
+          if (arr.length > 20) return false; // guardrail
+          return arr.every(
+            (s) =>
+              typeof s === "string" &&
+              s.trim().length > 0 &&
+              s.trim().length <= 50
+          );
+        },
+        message:
+          "Each preference must be a non-empty string (≤ 50 chars). Max 20 items.",
+      },
+    },
+
     accountVerified: { type: Boolean, default: false },
     verificationCode: Number,
     verificationCodeExpire: Date,
+
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+
     adminRequest: {
       status: {
         type: String,
@@ -65,12 +87,14 @@ const userSchema = new mongoose.Schema(
   { versionKey: false }
 );
 
+/* ---------------- Hooks ---------------- */
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 
+/* ---------------- Instance methods ---------------- */
 userSchema.methods.comparePassword = async function (enteredPassword) {
   return bcrypt.compare(enteredPassword, this.password);
 };
@@ -105,6 +129,7 @@ userSchema.methods.generateResetPasswordToken = function () {
   return resetToken;
 };
 
+/* ---------------- toJSON cleanup ---------------- */
 userSchema.set("toJSON", {
   transform(_doc, ret) {
     delete ret.password;

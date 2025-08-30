@@ -13,6 +13,9 @@ import {
   changePassword,
   getMyRegisteredEvents,
   getMyAttendedEvents,
+  getMyPreferences,
+  putMyPreferences,
+  patchMyPreferences,
 } from "../Controller/userController.js";
 import { isAuthenticated } from "../Middleware/auth.js";
 import upload from "../Middleware/multer.js";
@@ -37,4 +40,10 @@ router
   .route("/me/registered-events")
   .get(isAuthenticated, getMyRegisteredEvents);
 router.route("/me/attended-events").get(isAuthenticated, getMyAttendedEvents);
+// add this group below other /me routes:
+router
+  .route("/me/preferences")
+  .get(isAuthenticated, getMyPreferences)
+  .put(isAuthenticated, putMyPreferences)
+  .patch(isAuthenticated, patchMyPreferences);
 export default router;
