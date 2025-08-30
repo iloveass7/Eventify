@@ -1,7 +1,7 @@
 // src/components/RecommendedEvents.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Calendar, MapPin, Users, Clock, Brain, Sparkles } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Calendar, MapPin, Users, Clock, Brain, Sparkles, CheckCircle } from "lucide-react";
 import { API_BASE } from "../config/api";
 import { useTheme } from "../components/ThemeContext";
 
@@ -55,16 +55,47 @@ const fmtTime = (d) =>
 /* ---------------- component ---------------- */
 export default function RecommendedEvents() {
   const { isDarkMode } = useTheme();
+  const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [upcomingEvents, setupcomingEvents] = useState([]);
   const [prefs, setPrefs] = useState(() => getPrefsFromLocalStorage());
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  // NEW: auth + registration state
+  const [currentUser, setCurrentUser] = useState(null);
+  const [registering, setRegistering] = useState({}); // { [eventId]: boolean }
+
   useEffect(() => {
     const onStorage = () => setPrefs(getPrefsFromLocalStorage());
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    // also listen for our custom prefs:update event
+    const onPrefsUpdate = (e) => {
+      const fromEvt = Array.isArray(e?.detail?.preferences) ? e.detail.preferences : getPrefsFromLocalStorage();
+      setPrefs(fromEvt);
+    };
+    window.addEventListener("prefs:update", onPrefsUpdate);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("prefs:update", onPrefsUpdate);
+    };
+  }, []);
+
+  // fetch current user (to know role & login status)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/user/me`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success) setCurrentUser(data.user);
+        }
+      } catch (e) {
+        // non-fatal
+        console.warn("[RecommendedEvents] could not fetch current user:", e);
+      }
+    })();
   }, []);
 
   // fetch upcoming events (preserve console logs)
@@ -113,7 +144,6 @@ export default function RecommendedEvents() {
     const prefSet = new Set(prefs);
     const matches = upcomingEvents.filter((ev) => {
       const tags = normalizeTags(ev.tags);
-      // console.log("event", ev._id, "normalizedTags:", tags);
       return tags.some((t) => prefSet.has(t));
     });
 
@@ -141,6 +171,61 @@ export default function RecommendedEvents() {
     }, 5000);
     return () => clearInterval(interval);
   }, [recommended.length]);
+
+  // helpers for registration logic
+  const isAdminish = currentUser?.role === "Admin" || currentUser?.role === "PrimeAdmin";
+  const isUserRegistered = (event) =>
+    currentUser &&
+    Array.isArray(event.attendees) &&
+    event.attendees.some((a) => (a?._id || a) === currentUser._id);
+
+  const handleRegister = async (eventId) => {
+    if (!currentUser) {
+      navigate("/login");
+      return;
+    }
+    if (isAdminish) {
+      alert("Admins can’t register for events.");
+      return;
+    }
+
+    setRegistering((p) => ({ ...p, [eventId]: true }));
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch(`${API_BASE}/api/event/${eventId}/register`, {
+        method: "POST",
+        headers,
+        credentials: "include",
+      });
+      const data = await res.json();
+
+      if (data?.success) {
+        // Update the source list; recommended derives from upcomingEvents
+        setupcomingEvents((prev) =>
+          prev.map((ev) =>
+            ev._id === eventId
+              ? { ...ev, attendees: [...(ev.attendees || []), currentUser._id] }
+              : ev
+          )
+        );
+      } else {
+        if (res.status === 401 || res.status === 403) {
+          alert("Please log in again to register for events");
+          navigate("/login");
+        } else {
+          alert(data?.message || "Registration failed");
+        }
+      }
+    } catch (e) {
+      console.error("[RecommendedEvents] register error:", e);
+      alert("Registration failed. Please try again.");
+    } finally {
+      setRegistering((p) => ({ ...p, [eventId]: false }));
+    }
+  };
 
   /* ---------------- UI ---------------- */
   if (loading) {
@@ -193,12 +278,12 @@ export default function RecommendedEvents() {
         {/* Based on your interests: white in dark mode, black in light mode */}
         <div className="flex items-center justify-center gap-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-600" />
-            <span className={`text-sm ${isDarkMode ? "text-white" : "text-black"}`}>
+            <Sparkles className="w-6 h-6 text-purple-600" />
+            <span className={`text-lg ${isDarkMode ? "text-white" : "text-black"}`}>
               {noPrefs ? "No interests set yet" : (
                 <>
                   Based on your interests:&nbsp;
-                  <span className={`${isDarkMode ? "text-purple-300" : "text-purple-600"} font-medium`}>
+                  <span className={`${isDarkMode ? "text-purple-300" : "text-purple-600"} text-lg font-semibold`}>
                     {prefs.join(", ")}
                   </span>
                 </>
@@ -209,7 +294,7 @@ export default function RecommendedEvents() {
           {/* Modify -> /interests */}
           <Link
             to="/interests"
-            className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${
+            className={`px-4 py-2 rounded-full text-[0.9rem] font-semibold transition-all duration-300 ${
               isDarkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
@@ -219,10 +304,10 @@ export default function RecommendedEvents() {
       </div>
 
       {noPrefs ? (
-        <div className="flex justify-center items-center h-96">
-          <div className={`rounded-2xl border p-8 text-center max-w-xl ${isDarkMode ? "bg-gray-800 border-gray-700 text-gray-200" : "bg-white border-gray-200 text-gray-800"}`}>
-            <p className="font-semibold mb-2">No recommendations yet</p>
-            <p className="text-sm opacity-80">
+        <div className="flex justify-center items-center h-full">
+          <div className={`rounded-2xl border p-20 text-center max-w-screen ${isDarkMode ? "bg-gray-800 border-gray-700 text-gray-200" : "bg-white border-gray-200 text-gray-800"}`}>
+            <p className="font-semibold mb-2 text-2xl">No recommendations yet</p>
+            <p className="text-lg opacity-80">
               Set your interests on the <Link to="/interests" className="text-purple-600 underline">Interests</Link> page to get personalized suggestions.
             </p>
           </div>
@@ -238,6 +323,11 @@ export default function RecommendedEvents() {
             {recommended.map((event) => {
               const tags = normalizeTags(event.tags);
               const organizerName = event.organizer?.name || "Unknown";
+
+              const registered = isUserRegistered(event);
+              const registrationClosed = event?.registrationDeadline ? new Date() > new Date(event.registrationDeadline) : false;
+              const isFull = typeof event?.maxAttendees === "number" && Array.isArray(event.attendees) && event.attendees.length >= event.maxAttendees;
+
               return (
                 <div key={event._id} className={`h-full flex flex-col md:flex-row relative overflow-hidden ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
                   {/* Image */}
@@ -250,8 +340,8 @@ export default function RecommendedEvents() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                     {/* Simple high match badge if any tag intersects */}
                     {tags.some((t) => prefs.includes(t)) && (
-                      <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                        <Brain className="w-3 h-3" />
+                      <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white px-5 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                        <Brain className="w-4 h-4" />
                         High Match
                       </div>
                     )}
@@ -328,12 +418,41 @@ export default function RecommendedEvents() {
 
                     {/* Actions */}
                     <div className="flex gap-3">
-                      <Link
-                        to={`/events/${event._id}`}
-                        className="bg-purple-600 text-white px-8 py-3 rounded-full hover:bg-purple-700 transition-all duration-300 text-lg font-medium flex-1 transform hover:scale-105 shadow-lg hover:shadow-xl text-center"
-                      >
-                        Join Now!
-                      </Link>
+                      {/* Left side: register / state / admin note */}
+                      {isAdminish ? (
+                        <div
+                          className={`flex-1 px-6 py-3 rounded-full text-center font-semibold border ${
+                            isDarkMode
+                              ? "bg-red-900/50 text-red-200 border-red-700"
+                              : "bg-red-100 text-red-700 border-red-200"
+                          }`}
+                        >
+                          Admins can’t register for events.
+                        </div>
+                      ) : registered ? (
+                        <div className="flex items-center justify-center gap-2 bg-green-100 text-green-800 px-6 py-3 rounded-full flex-1 shadow-sm">
+                          <CheckCircle className="w-5 h-5" />
+                          <span className="font-semibold text-base">Registered</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleRegister(event._id)}
+                          disabled={registering[event._id] || isFull || registrationClosed}
+                          className={`bg-purple-600 text-white px-8 py-3 rounded-full transition-colors duration-300 text-lg font-medium flex-1 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isFull || registrationClosed ? "" : "hover:bg-purple-700"
+                          }`}
+                        >
+                          {registering[event._id]
+                            ? "Processing..."
+                            : isFull
+                            ? "Event Full"
+                            : registrationClosed
+                            ? "Registration Closed"
+                            : "Register Now!"}
+                        </button>
+                      )}
+
+                      {/* Right side: details link (unchanged layout, no scale) */}
                       <Link
                         to={`/events/${event._id}`}
                         className={`px-6 py-3 rounded-full border-2 border-purple-600 font-medium transition-all duration-300 text-center ${

@@ -1,4 +1,5 @@
-// UpcomingEvents.jsx - Fixed Authentication Issues + Admin guard + no zoom hovers
+// src/components/UpcomingEvents.jsx
+// Fixed Authentication Issues + Admin guard + no zoom hovers
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -53,6 +54,72 @@ const UpcomingEvents = ({ isDarkMode }) => {
       .split(/[,\s]+/)
       .map(cleanOne)
       .filter(Boolean);
+  };
+
+  // Add event tags to user preferences (server + localStorage + broadcast)
+  const addEventTagsToUserPrefs = async (eventObj) => {
+    if (!currentUser || !eventObj) return;
+
+    const eventTags = normalizeTags(eventObj.tags);
+    if (eventTags.length === 0) return;
+
+    const currentPrefs = Array.isArray(currentUser.preferences)
+      ? currentUser.preferences.map((s) => String(s).toLowerCase())
+      : [];
+
+    const toAdd = eventTags.filter((t) => !currentPrefs.includes(t));
+    if (toAdd.length === 0) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch(`${API_BASE}/api/user/me/preferences`, {
+        method: "PATCH",
+        credentials: "include",
+        headers,
+        body: JSON.stringify({ add: toAdd }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.warn("[UpcomingEvents] Failed to add prefs:", data?.message);
+        return;
+      }
+
+      // Use server echo if present, otherwise merge
+      const finalPrefs = Array.isArray(data.preferences)
+        ? data.preferences.map((s) => String(s).toLowerCase())
+        : Array.from(new Set([...currentPrefs, ...toAdd]));
+
+      // Update in-memory user
+      setCurrentUser((prev) => (prev ? { ...prev, preferences: finalPrefs } : prev));
+
+      // Update localStorage mirrors (auth_user, user)
+      const keys = ["auth_user", "user"];
+      for (const k of keys) {
+        const raw = localStorage.getItem(k);
+        if (!raw) continue;
+        try {
+          const obj = JSON.parse(raw);
+          if (Array.isArray(obj?.preferences)) obj.preferences = finalPrefs;
+          if (obj?.user && Array.isArray(obj.user.preferences)) obj.user.preferences = finalPrefs;
+          localStorage.setItem(k, JSON.stringify(obj));
+        } catch {
+          // ignore malformed localStorage
+        }
+      }
+
+      // Notify listeners immediately
+      try {
+        window.dispatchEvent(new CustomEvent("prefs:update", { detail: { preferences: finalPrefs } }));
+      } catch {}
+      // Fallback for components listening to "storage" only
+      window.dispatchEvent(new Event("storage"));
+    } catch (e) {
+      console.warn("[UpcomingEvents] Error updating preferences after register:", e);
+    }
   };
 
   // Fetch upcoming events and user data
@@ -166,6 +233,7 @@ const UpcomingEvents = ({ isDarkMode }) => {
       const data = await res.json();
 
       if (data.success) {
+        // Update attendees locally
         setEvents((prev) =>
           prev.map((ev) =>
             ev._id === eventId
@@ -173,6 +241,12 @@ const UpcomingEvents = ({ isDarkMode }) => {
               : ev
           )
         );
+
+        // NEW: also add this event's tags to user preferences
+        const evObj = events.find((e) => e._id === eventId);
+        if (evObj) {
+          await addEventTagsToUserPrefs(evObj);
+        }
       } else {
         if (res.status === 401 || res.status === 403) {
           alert("Please log in again to register for events");

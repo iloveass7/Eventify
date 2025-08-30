@@ -1,3 +1,4 @@
+// src/pages/EventDetails.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../components/ThemeContext";
@@ -25,7 +26,9 @@ const normalizeTags = (raw) => {
       .trim()
       .replace(/^#/, "")
       .replace(/^\[|\]$/g, "")
-      .replace(/^"|"$/g, "");
+      .replace(/^"|"$/g, "")
+      .toLowerCase(); // ensure lowercase so it matches how prefs are stored
+
   if (Array.isArray(raw)) return raw.map(clean).filter(Boolean);
 
   let s = String(raw).trim();
@@ -40,6 +43,65 @@ const normalizeTags = (raw) => {
     .map(clean)
     .filter(Boolean);
 };
+
+// persist updated preferences into localStorage copies used around the app
+function mergePrefsIntoLocalStorage(addList) {
+  if (!Array.isArray(addList) || addList.length === 0) return;
+
+  const keys = ["auth_user", "user"];
+  for (const k of keys) {
+    const raw = localStorage.getItem(k);
+    if (!raw) continue;
+    try {
+      const obj = JSON.parse(raw);
+      const existing =
+        Array.isArray(obj?.preferences)
+          ? obj.preferences
+          : Array.isArray(obj?.user?.preferences)
+          ? obj.user.preferences
+          : [];
+
+      const seen = new Set(existing.map((s) => String(s).trim().toLowerCase()));
+      let changed = false;
+      for (const t of addList) {
+        const v = String(t || "").trim().toLowerCase();
+        if (v && !seen.has(v)) {
+          existing.push(v);
+          seen.add(v);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        if (Array.isArray(obj?.preferences)) obj.preferences = existing;
+        if (obj?.user && Array.isArray(obj.user.preferences))
+          obj.user.preferences = existing;
+        localStorage.setItem(k, JSON.stringify(obj));
+      }
+    } catch {
+      // ignore malformed localStorage
+    }
+  }
+
+  // Let listeners (e.g., RecommendedEvents) update immediately
+  try {
+    const merged = new Set();
+    for (const k of keys) {
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      const obj = JSON.parse(raw);
+      const arrs = [obj?.preferences, obj?.user?.preferences].filter(Boolean);
+      for (const a of arrs) {
+        if (Array.isArray(a)) a.forEach((s) => merged.add(String(s).toLowerCase()));
+      }
+    }
+    window.dispatchEvent(
+      new CustomEvent("prefs:update", {
+        detail: { preferences: Array.from(merged) },
+      })
+    );
+  } catch {}
+}
 
 const EventDetails = () => {
   const { id } = useParams();
@@ -177,6 +239,51 @@ const EventDetails = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [lightboxOpen, gal.items.length]);
 
+  // ---- NEW: add event's category to user preferences on successful registration ----
+  const addEventTagsToUserPrefs = async () => {
+    try {
+      const eventTags = normalizeTags(event?.tags);
+      if (!eventTags.length) return;
+
+      const currentPrefs = Array.isArray(currentUser?.preferences)
+        ? currentUser.preferences.map((s) => String(s).toLowerCase())
+        : [];
+      const toAdd = eventTags.filter((t) => !currentPrefs.includes(t));
+      if (!toAdd.length) return;
+
+      const token = localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch(`${API_BASE}/api/user/me/preferences`, {
+        method: "PATCH",
+        credentials: "include",
+        headers,
+        body: JSON.stringify({ add: toAdd }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.warn("[EventDetails] failed to add prefs from registration:", data?.message);
+        return;
+      }
+
+      // Update state user
+      const newPrefs = Array.isArray(data.preferences)
+        ? data.preferences.map((s) => String(s).toLowerCase())
+        : [...currentPrefs, ...toAdd];
+
+      setCurrentUser((prev) => (prev ? { ...prev, preferences: newPrefs } : prev));
+
+      // Update localStorage for other components & notify
+      mergePrefsIntoLocalStorage(newPrefs);
+
+      // Also dispatch a bare storage event fallback (not all browsers fire it on setItem in same tab)
+      window.dispatchEvent(new Event("storage"));
+    } catch (e) {
+      console.warn("[EventDetails] error updating preferences after register:", e);
+    }
+  };
+
   const handleRegistrationToggle = async () => {
     if (!currentUser) {
       alert("Please log in to register for events.");
@@ -210,8 +317,13 @@ const EventDetails = () => {
                   (typeof a === "string" ? a : a?._id) !== currentUser._id
               )
             : [...prevAtt, currentUser._id];
-          return { ...prev, attendees: updated };
+        return { ...prev, attendees: updated };
         });
+
+        // NEW: Only on successful "register" do we add the event's category to user prefs
+        if (!isRegistered) {
+          await addEventTagsToUserPrefs();
+        }
       } else {
         alert(data.message || "An error occurred.");
       }
